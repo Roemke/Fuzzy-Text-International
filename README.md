@@ -1,5 +1,24 @@
+
 Fuzzy Text International
 ========================
+
+This is nearly the original Fuzzy Text International.
+
+
+Modifications
+ - fixed bug in num2words.h
+ - appinfo.json version is not ok (only two numbers not three)
+ - Text in German is adapted (todo)
+
+Additions
+ - Bluetooth state (todo)
+ - Akku state (todo)
+ - show delta to exact time as number (todo)
+ - show minutes done / minutes left according to a time interval (todo)
+ 
+
+-----------------------------------------------------
+original README.md
 
 This is a watchface for the [Pebble][].  It is originally based on the
 [PebbleTextWatch][] by Mihai Dumitrache, which reproduced the look of
