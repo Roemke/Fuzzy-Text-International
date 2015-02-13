@@ -3,7 +3,7 @@
 const char* const HOURS_DE[] = {
   // AM hours
   "zwölf",
-  "ein",
+  "ein", //noch ein problem eins <-> ein, evtl. einfach im code beruecksichtigen
   "zwei",
   "drei",
   "vier",
@@ -43,12 +43,14 @@ const char* const RELS_DE[] = {
   "zehn nach *$1",
   "viertel nach *$1",
   "zwanzig nach *$1",
-  "fünfund- zwanzig nach *$1",
+  //"fünfund- zwanzig nach *$1",
+  "fünf vor halb *$2",
   "halb *$2",
-  "fünfund- zwanzig vor *$2",
+  //"fünfund- zwanzig vor *$2",
+  "fünf nach halb *$2",
   "zwanzig vor *$2",
   "viertel vor *$2",
   "zehn vor *$2",
   "fünf vor *$2"
-};
+}; 
 

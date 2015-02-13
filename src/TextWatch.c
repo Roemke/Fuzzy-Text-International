@@ -2,12 +2,19 @@
 
 #include "num2words.h"
 
-#define DEBUG 0
+#define DEBUG 1 
+//if debug to 1 appinfo.json.watchapp has to be used - not sure, but nearly :-)
+#define MAX_WIDTH_PX 50  //kr to do 
+
+//for function calls when updating lines see readmeKR.txt
+//maybe I need to change the original flow because of the font
+//problem 
 
 #define NUM_LINES 4
 #define LINE_LENGTH 7
 #define BUFFER_SIZE (LINE_LENGTH + 2)
 #define ROW_HEIGHT 37
+#define ROW_HEIGHT_SMALL 27 //kr, todo
 #define TOP_MARGIN 10
 
 #define INVERT_KEY 0
@@ -50,9 +57,13 @@ typedef struct {
 static Line lines[NUM_LINES];
 static InverterLayer *inverter_layer;
 
-static struct tm *t;
-
+//static time why, try to rename
+static struct tm *actual_time; //renamed from t in the original source
+#if DEBUG
+static  struct tm debug_time = {.tm_sec=0, .tm_min=0, .tm_hour=0};
+#endif
 static int currentNLines;
+
 
 // Animation handler
 static void animationStoppedHandler(struct Animation *animation, bool finished, void *context)
@@ -89,7 +100,7 @@ static void makeAnimationsForLayer(Line *line, int delay)
 
 	// Configure animation for current layer to move in
 	GRect rect2 = layer_get_frame((Layer *)next);
-	rect2.origin.x = 0;
+	rect2.origin.x = 0; //looks correct but string with width 142 does not fit into layer
 	line->animation2 = property_animation_create_layer_frame((Layer *)next, NULL, &rect2);
 	animation_set_duration(&line->animation2->animation, ANIMATION_DURATION);
 	animation_set_delay(&line->animation2->animation, delay + ANIMATION_OUT_IN_DELAY);
@@ -109,9 +120,10 @@ static void updateLayerText(TextLayer* layer, char* text)
 {
 	const char* layerText = text_layer_get_text(layer);
 	strcpy((char*)layerText, text);
+	//(kr) hier haben wir die breite / koennen sie auslesen
 	// To mark layer dirty
 	text_layer_set_text(layer, layerText);
-    //layer_mark_dirty(&layer->layer);
+    //layer_mark_dirty(&layer->layer); //kr war auskommentiert - unnoetig?
 }
 
 // Update line
@@ -155,13 +167,25 @@ static GTextAlignment lookup_text_alignment(int align_key)
 	return alignment;
 }
 
-// Configure bold line of text
+// 2015-02-12 (kr) configure layer 
+static void configureLayer(TextLayer *textlayer,const char * fontKey )
+{
+	text_layer_set_font(textlayer, fonts_get_system_font(fontKey));
+	text_layer_set_text_color(textlayer, GColorWhite);
+	text_layer_set_background_color(textlayer, GColorClear);
+	text_layer_set_text_alignment(textlayer, lookup_text_alignment(text_align));
+	//APP_LOG(APP_LOG_LEVEL_INFO,"bold layer");
+}
+
+/*
+// Configure bold line of text (kr) removed
 static void configureBoldLayer(TextLayer *textlayer)
 {
 	text_layer_set_font(textlayer, fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
 	text_layer_set_text_color(textlayer, GColorWhite);
 	text_layer_set_background_color(textlayer, GColorClear);
 	text_layer_set_text_alignment(textlayer, lookup_text_alignment(text_align));
+	//APP_LOG(APP_LOG_LEVEL_INFO,"bold layer");
 }
 
 // Configure light line of text
@@ -171,25 +195,38 @@ static void configureLightLayer(TextLayer *textlayer)
 	text_layer_set_text_color(textlayer, GColorWhite);
 	text_layer_set_background_color(textlayer, GColorClear);
 	text_layer_set_text_alignment(textlayer, lookup_text_alignment(text_align));
+	//APP_LOG(APP_LOG_LEVEL_INFO,"light layer");
 }
-
+*/
 // Configure the layers for the given text
+//returns number of lines we need
 static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format[])
 {
 	int numLines = 0;
-
+        //lines is array of size NUM_LINES (4) of type Line 
 	// Set bold layer.
 	int i;
+	int flagWidth = 0;
 	for (i = 0; i < NUM_LINES; i++) {
 		if (strlen(text[i]) > 0) {
 			if (format[i] == 'b')
 			{
-				configureBoldLayer(lines[i].nextLayer);
+				configureLayer(lines[i].nextLayer,FONT_KEY_BITHAM_42_BOLD); //Bold for Hours (see in strings... marked with *
 			}
 			else
 			{
-				configureLightLayer(lines[i].nextLayer);
+				configureLayer(lines[i].nextLayer,FONT_KEY_BITHAM_42_LIGHT);
 			}
+			//2015-02-12 (kr) try to check size - sieht gut aus, aber es gibt zu wenig fonts
+			//nein, hatte oben getestet, hier werde ich die breite noch nicht haben
+			//stimmt, hab sie nicht - schade, evtl einen text_layer nur zum checken anlegen
+			GSize size = text_layer_get_content_size(lines[i].nextLayer);
+			APP_LOG(APP_LOG_LEVEL_INFO,"height is %i and width %i",size.h,size.w);
+			if (size.w > MAX_WIDTH_PX) //need to fix the font and the line arrangement
+				flagWidth = 1; //need to rearrange
+			//-----------------
+
+			
 		}
 		else
 		{
@@ -197,26 +234,29 @@ static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format
 		}
 	}
 	numLines = i;
-
+	
+	int rowHeight = ROW_HEIGHT;
+	if (flagWidth)
+	   rowHeight = ROW_HEIGHT_SMALL;
 	// Calculate y position of top Line
-	int ypos = (168 - numLines * ROW_HEIGHT) / 2 - TOP_MARGIN;
+	int ypos = (168 - numLines * rowHeight) / 2 - TOP_MARGIN;
 
 	// Set y positions for the lines
 	for (int i = 0; i < numLines; i++)
 	{
-		layer_set_frame((Layer *)lines[i].nextLayer, GRect(144, ypos, 144, 50));
-		ypos += ROW_HEIGHT;
+		layer_set_frame((Layer *)lines[i].nextLayer, GRect(144, ypos, 144, 50)); //x y w h
+		ypos += rowHeight;
 	}
 
 	return numLines;
 }
 
-static void time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LINES][BUFFER_SIZE], char format[])
+static int time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LINES][BUFFER_SIZE], char format[])
 {
 	int length = NUM_LINES * BUFFER_SIZE + 1;
 	char timeStr[length];
-	time_to_words(lang, hours, minutes, seconds, timeStr, length);
-	
+	int delta = time_to_words(lang, hours, minutes, seconds, timeStr, length);
+	//(kr) 2015-02-12: positve delta: real time is time + n Minutes
 	// Empty all lines
 	for (int i = 0; i < NUM_LINES; i++)
 	{
@@ -260,7 +300,7 @@ static void time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LI
 		start = end + 1;
 		end = strstr(start, " ");
 	}
-	
+	return delta;
 }
 
 // Update screen based on new time
@@ -270,8 +310,10 @@ static void display_time(struct tm *t)
 	char textLine[NUM_LINES][BUFFER_SIZE];
 	char format[NUM_LINES];
 
-	time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
+        //(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
+	int delta = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
 	
+	//(kr) hier wird übergeben, aber Text nicht gesetzt
 	int nextNLines = configureLayersForText(textLine, format);
 
 	int delay = 0;
@@ -282,7 +324,7 @@ static void display_time(struct tm *t)
 		}
 	}
 	
-	currentNLines = nextNLines;
+	currentNLines = nextNLines; //currentNLines ist static
 }
 
 static void initLineForStart(Line* line)
@@ -299,7 +341,7 @@ static void initLineForStart(Line* line)
 }
 
 // Update screen without animation first time we start the watchface
-static void display_initial_time(struct tm *t)
+static void display_actual_time(struct tm *t)
 {
 	// The current time text will be stored in the following strings
 	char textLine[NUM_LINES][BUFFER_SIZE];
@@ -322,8 +364,11 @@ static void display_initial_time(struct tm *t)
 // Time handler called every minute by the system
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
-	t = tick_time;
-	display_time(tick_time);
+  #if DEBUG==0
+	actual_time = tick_time;
+	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
+	display_time(actual_time);	
+	#endif
 }
 
 /**
@@ -332,47 +377,64 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
  */
 #if DEBUG
 
-static void up_single_click_handler(ClickRecognizerRef recognizer, Window *window) {
-	(void)recognizer;
-	(void)window;
-	
-	t->tm_min += 5;
-	if (t->tm_min >= 60) {
-		t->tm_min = 0;
-		t->tm_hour += 1;
+static void up_single_click_handler(ClickRecognizerRef recognizer, void * context){ // Window *window) {
+	//(void)recognizer;
+	//(void)window; //hmm, it does not work with actual_time (was t in original)
+	if ( debug_time.tm_sec == 0 && debug_time.tm_min==0 && debug_time.tm_hour==0) //set time from actual_time
+	{
+		debug_time.tm_sec = actual_time->tm_sec ;
+		debug_time.tm_min = actual_time->tm_min ;
+		debug_time.tm_hour = actual_time->tm_hour ;
+	}
+	debug_time.tm_sec=0;
+	debug_time.tm_min += 5;
+	if (debug_time.tm_min >= 60) {
+		debug_time.tm_min = 0;
+		debug_time.tm_hour += 1;
 		
-		if (t->tm_hour >= 24) {
-			t->tm_hour = 0;
+		if (debug_time.tm_hour >= 24) {
+			debug_time.tm_hour = 0;
 		}
 	}
-	display_time(t);
+	APP_LOG(APP_LOG_LEVEL_DEBUG,"up click with minutes %i",debug_time.tm_min);
+	display_time(&debug_time);
 }
 
 
-static void down_single_click_handler(ClickRecognizerRef recognizer, Window *window) {
-	(void)recognizer;
-	(void)window;
-	
-	t->tm_min -= 5;
-	if (t->tm_min < 0) {
-		t->tm_min = 55;
-		t->tm_hour -= 1;
+static void down_single_click_handler(ClickRecognizerRef recognizer, void * context) {//Window *window) {
+	//(void)recognizer;
+	//(void)window;
+	if ( debug_time.tm_sec == 0 && debug_time.tm_min==0 && debug_time.tm_hour==0) //set time from actual_time
+	{
+		debug_time.tm_sec = actual_time->tm_sec ;
+		debug_time.tm_min = actual_time->tm_min ;
+		debug_time.tm_hour = actual_time->tm_hour ;
+	}
+	debug_time.tm_sec = 0;
+	debug_time.tm_min -= 5;
+	if (debug_time.tm_min < 0) {
+		debug_time.tm_min = 55;
+		debug_time.tm_hour -= 1;
 		
-		if (t->tm_hour < 0) {
-			t->tm_hour = 23;
+		if (debug_time.tm_hour < 0) {
+			debug_time.tm_hour = 23;
 		}
 	}
-	display_time(t);
+  APP_LOG(APP_LOG_LEVEL_DEBUG,"down click with minutes %i",debug_time.tm_min);
+	display_time(&debug_time);
 }
 
-static void click_config_provider(ClickConfig **config, Window *window) {
-  (void)window;
+static void click_config_provider(void * config){ //ClickConfig **config, Window *window) {
+  //(void)window; (kr) ClickConfig unknown, why (void)
 
-  config[BUTTON_ID_UP]->click.handler = (ClickHandler) up_single_click_handler;
-  config[BUTTON_ID_UP]->click.repeat_interval_ms = 100;
+  //config[BUTTON_ID_UP]->click.handler = (ClickHandler) up_single_click_handler;
+  //config[BUTTON_ID_UP]->click.repeat_interval_ms = 100;
+  //config[BUTTON_ID_DOWN]->click.handler = (ClickHandler) down_single_click_handler;
+  //config[BUTTON_ID_DOWN]->click.repeat_interval_ms = 100;
 
-  config[BUTTON_ID_DOWN]->click.handler = (ClickHandler) down_single_click_handler;
-  config[BUTTON_ID_DOWN]->click.repeat_interval_ms = 100;
+  //(kr) ClickHandler seems to be necessary
+  window_single_click_subscribe(BUTTON_ID_UP, (ClickHandler) up_single_click_handler);
+  window_single_click_subscribe(BUTTON_ID_DOWN, (ClickHandler) down_single_click_handler);  
 }
 
 #endif
@@ -388,7 +450,7 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 		case TEXT_ALIGN_KEY:
 			text_align = new_tuple->value->uint8;
 			persist_write_int(TEXT_ALIGN_KEY, text_align);
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set text alignment: %u", text_align);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set text alignment: %i", text_align);
 
 			alignment = lookup_text_alignment(text_align);
 			for (int i = 0; i < NUM_LINES; i++)
@@ -402,7 +464,7 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 		case INVERT_KEY:
 			invert = new_tuple->value->uint8 == 1;
 			persist_write_bool(INVERT_KEY, invert);
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set invert: %u", invert ? 1 : 0);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set invert: %i", invert ? 1 : 0);
 
 			layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
 			layer_mark_dirty(inverter_layer_get_layer(inverter_layer));
@@ -410,11 +472,12 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 		case LANGUAGE_KEY:
 			lang = (Language) new_tuple->value->uint8;
 			persist_write_int(LANGUAGE_KEY, lang);
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set language: %u", lang);
-
-			if (t)
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set language: %i", lang);
+      //was soll das, ich denke sofortige Reaktion? ?
+      
+			if (actual_time)
 			{
-				display_time(t);
+				display_time(actual_time);
 			}
 	}
 }
@@ -422,13 +485,15 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 static void init_line(Line* line)
 {
 	// Create layers with dummy position to the right of the screen
-	line->currentLayer = text_layer_create(GRect(144, 0, 144, 50));
+	line->currentLayer = text_layer_create(GRect(144, 0, 144, 50));//x y w h 
 	line->nextLayer = text_layer_create(GRect(144, 0, 144, 50));
-
-	// Configure a style
-	configureLightLayer(line->currentLayer);
-	configureLightLayer(line->nextLayer);
-
+  //144 means at the right end of the frame?
+  
+	// Configure a style (kr) reduced functions
+	//configureLightLayer(line->currentLayer);
+	//configureLightLayer(line->nextLayer);
+	configureLayer(line->currentLayer,FONT_KEY_BITHAM_42_LIGHT);	
+	configureLayer(line->nextLayer,FONT_KEY_BITHAM_42_LIGHT);
 	// Set the text buffers
 	line->lineStr1[0] = '\0';
 	line->lineStr2[0] = '\0';
@@ -451,7 +516,8 @@ static void window_load(Window *window)
 {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_frame(window_layer);
-
+  APP_LOG(APP_LOG_LEVEL_INFO, "Window load:  x %i y %i w %i h %i", bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h);
+	//ok, get x 0 y 0 w 144 h 168
 	// Init and load lines
 	for (int i = 0; i < NUM_LINES; i++)
 	{
@@ -466,10 +532,9 @@ static void window_load(Window *window)
 
 	// Configure time on init
 	time_t raw_time;
-
 	time(&raw_time);
-	t = localtime(&raw_time);
-	display_initial_time(t);
+	actual_time = localtime(&raw_time); //where is memory handled
+	display_actual_time(actual_time);
 
 	Tuplet initial_values[] = {
 		TupletInteger(TEXT_ALIGN_KEY, (uint8_t) text_align),
@@ -498,17 +563,17 @@ static void handle_init() {
 	if (persist_exists(TEXT_ALIGN_KEY))
 	{
 		text_align = persist_read_int(TEXT_ALIGN_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read text alignment from store: %u", text_align);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read text alignment from store: %i", text_align);
 	}
 	if (persist_exists(INVERT_KEY))
 	{
 		invert = persist_read_bool(INVERT_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read invert from store: %u", invert ? 1 : 0);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read invert from store: %i", invert ? 1 : 0);
 	}
 	if (persist_exists(LANGUAGE_KEY))
 	{
 		lang = (Language) persist_read_int(LANGUAGE_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read language from store: %u", lang);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read language from store: %i", lang);
 	}
 
 	window = window_create();

@@ -12,4 +12,4 @@ typedef enum {
   SV    = 0x7
 } Language;
 
-void time_to_words(Language lang, int hours, int minutes, int seconds, char* words, size_t length);
+int time_to_words(Language lang, int hours, int minutes, int seconds, char* words, size_t length);

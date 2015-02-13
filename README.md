@@ -1,14 +1,16 @@
 
-Fuzzy Text International
+Fuzzy Text International Student & Teacher Version
 ========================
 
-This is nearly the original Fuzzy Text International.
+This is based on Fuzzy Text International from Jesse Hallett
 
 
 Modifications
- - fixed bug in num2words.h
+ - fixed bug in num2words.h (done)
  - appinfo.json version is not ok (only two numbers not three)
- - Text in German is adapted (todo)
+ - Text in German is adapted ein / eins and fuenf vor halb instead of 25 nach (partially todo)
+ - fixed debugging option, remember to use different appinfo.json 
+   use debug_time to avoid conflicts with the "normal time" (done)
 
 Additions
  - Bluetooth state (todo)
