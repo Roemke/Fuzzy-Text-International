@@ -3,7 +3,7 @@
 const char* const HOURS_DE[] = {
   // AM hours
   "zwölf",
-  "ein", //noch ein problem eins <-> ein, evtl. einfach im code beruecksichtigen
+  "eins", //noch ein problem eins <-> ein, evtl. einfach im code beruecksichtigen
   "zwei",
   "drei",
   "vier",
@@ -17,7 +17,7 @@ const char* const HOURS_DE[] = {
 
   // PM hours
   "zwölf",
-  "ein",
+  "eins",
   "zwei",
   "drei",
   "vier",
@@ -38,7 +38,7 @@ const char* const HOURS_DE[] = {
  * A "*" character before a word makes that word bold.
  */
 const char* const RELS_DE[] = {
-  "*$1 Uhr",
+  "es ist *$1", //"*$1 Uhr",
   "fünf nach *$1",
   "zehn nach *$1",
   "viertel nach *$1",

@@ -8,14 +8,18 @@ This is based on Fuzzy Text International from Jesse Hallett
 Modifications
  - fixed bug in num2words.h (done)
  - appinfo.json version is not ok (only two numbers not three)
- - Text in German is adapted ein / eins and fuenf vor halb instead of 25 nach (partially todo)
+ - Text in German is adapted ein / eins and fuenf vor halb instead of 25 nach
+   changed German REL text from *$1 Uhr to es ist *$1
+   advantage: line three is small in German Display - use this part for Delta
+   (see additions)
+ - changed positioning of rows 
  - fixed debugging option, remember to use different appinfo.json 
    use debug_time to avoid conflicts with the "normal time" (done)
 
 Additions
  - Bluetooth state (todo)
  - Akku state (todo)
- - show delta to exact time as number (todo)
+ - show delta to exact time as number  (exact - fuzzy) (todo)
  - show minutes done / minutes left according to a time interval (todo)
  
 

@@ -1,28 +1,23 @@
 <!DOCTYPE html>
-<!--[if lt IE 7 ]><html class="ie ie6" lang="en"> <![endif]-->
-<!--[if IE 7 ]><html class="ie ie7" lang="en"> <![endif]-->
-<!--[if IE 8 ]><html class="ie ie8" lang="en"> <![endif]-->
-<!--[if (gte IE 9)|!(IE)]><!--><html lang="en"> <!--<![endif]-->
 <head>
 
 	<!-- Basic Page Needs
   ================================================== -->
 	<meta charset="utf-8">
 	<title>Configure Fuzzy Text</title>
-	<meta name="description" content="configuration page for Fuzzy Text International, a Pebble watchface">
-	<meta name="author" content="Jesse Hallett <jesse@sitr.us>">
+	<meta name="description" content="configuration page for Fuzzy Text International
+  S & T version , a Pebble watchface">
 
 	<!-- Mobile Specific Metas
   ================================================== -->
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
-	<!-- CSS
+	<!-- CSS hmmm bootstrap is not really small - necesssary for simple
+	configuration ?
   ================================================== -->
+  <!-- check without 
 	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
-
-	<!--[if lt IE 9]>
-		<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
-	<![endif]-->
+  -->
 
 </head>
 <body>
@@ -36,7 +31,7 @@
 		</header>
 		
 		<div id="update-available" class="hidden bg-danger" style="padding:0.75em">
-			<p>There is a new version of Fuzzy Text International
+			<p>There is a new version of Fuzzy Text International S &amp; T
 			available - some settings will not work until you update to
 			the new version. <a href="CHANGES.html">See
 			details</a></p>
@@ -139,7 +134,29 @@
 					</label>
 				</div>
 			</fieldset>
-
+			<fieldset>
+				<legend>Time options:</legend>
+				<div class="checkbox">
+					<label>
+						<input type="checkbox" name="delta" value="off" />
+						show delta to exact time
+					</label>
+					If switched to on there will be added a text-layer which shows
+					the difference from the fuzzy time to the exact time: exact -
+					fuzzy in minutes. Layout must be
+					left or right to show the delta. Position is in next-to-last line.  
+				</div>				
+			</fieldset>
+			<fieldset>
+				<legend>Technical options:</legend>
+				<div class="checkbox">
+					<label>
+						<input type="checkbox" name="battery" value="off" />
+						show line which indicates battery status
+					</label>
+				</div>				
+			</fieldset>
+				              
 			<fieldset>
 				<a href="pebblejs://close" class="btn btn-lg btn-default" role="button">Cancel</a>
 				<button type="button" class="btn btn-lg btn-primary" id="b-submit">Save</button>
@@ -150,28 +167,33 @@
 
 <!-- End Document
 ================================================== -->
-
+  <!-- change it to own hosted jquery script -->
 	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
 	<script>
-		var LATEST = "1.2.1";
+		var LATEST = "1.3";
 
 		function saveOptions() {
-			var params = {};
+			var params = {}; //read content of #config as array 
 			$('#config').serializeArray().forEach(function(pair) {
 				params[pair.name] = pair.value;
 			});
 
+      //#config array to options object
 			var options = {
 				invert:		params.invert === 'on',
 				text_align:	params.align || 'center',
-				lang:		params.lang
+				lang:		params.lang,
+				delta:  params.delta === 'on'
 			}
 			return options;
 		}
 
+    //first called 
 		function applyOptions() {
 			var $form	= $('#config');
-			var opts	= JSON.parse(getParam('options'));
+			var opts	= JSON.parse(getParam('options')); 
+			//options coming from caller of this page - stored on phone I think,
+			//yes, call is coming from pebble-js-app
 			if (opts && opts.invert) {
 				$form.find('[name="invert"]').prop('checked', true);
 			}
@@ -185,8 +207,14 @@
 					return btn.value === opts.lang;
 				}).prop('checked', true);
 			}
+			if (opts && opts.delta) {
+				$form.find('[name="delta"]').filter(function(i, btn) {
+					return btn.value === opts.delta;
+				}).prop('checked', true);
+			}
 		}
 
+    //options are transferred via get I think
 		function getParam(key) {
 			var params = window.location.hash;
 			var val;

@@ -4,7 +4,7 @@
 
 #define DEBUG 1 
 //if debug to 1 appinfo.json.watchapp has to be used - not sure, but nearly :-)
-#define MAX_WIDTH_PX 50  //kr to do 
+#define MAX_WIDTH_PX 130  //kr  
 
 //for function calls when updating lines see readmeKR.txt
 //maybe I need to change the original flow because of the font
@@ -13,13 +13,15 @@
 #define NUM_LINES 4
 #define LINE_LENGTH 7
 #define BUFFER_SIZE (LINE_LENGTH + 2)
-#define ROW_HEIGHT 37
-#define ROW_HEIGHT_SMALL 27 //kr, todo
-#define TOP_MARGIN 10
+#define ROW_HEIGHT 36 //was 37
+#define ROW_HEIGHT_SMALL 30 //kr
 
+//define keys for persistence on pebble
 #define INVERT_KEY 0
 #define TEXT_ALIGN_KEY 1
 #define LANGUAGE_KEY 2
+#define DELTA_KEY 3   
+//-----------------
 
 #define TEXT_ALIGN_CENTER 0
 #define TEXT_ALIGN_LEFT 1
@@ -37,10 +39,12 @@
 #define LINE_APPEND_LIMIT (LINE_LENGTH - LINE_APPEND_MARGIN)
 
 static AppSync sync;
-static uint8_t sync_buffer[64];
+static uint8_t sync_buffer[128]; //(kr) was 64, maybe enough
 
 static int text_align = TEXT_ALIGN_CENTER;
 static bool invert = false;
+static bool delta = false; //kr options static, oh c kann bool dachte waere c++
+	//delta is for showing exact - fuzzy
 static Language lang = EN_US;
 
 static Window *window;
@@ -52,12 +56,19 @@ typedef struct {
 	char lineStr2[BUFFER_SIZE];
 	PropertyAnimation *animation1;
 	PropertyAnimation *animation2;
+	unsigned int currentFontSmall;
+	unsigned int nextFontSmall;
 } Line;
 
 static Line lines[NUM_LINES];
 static InverterLayer *inverter_layer;
 
-//static time why, try to rename
+static TextLayer * tempLayer ; // = text_layer_create(GRect(144, 0, 144, 50));
+char tempLayerText[BUFFER_SIZE];
+
+static TextLayer * deltaLayer; 
+char deltaLayerText[]="(+0)"; // ( sign digit ) \0 without spaces 
+//static time was *t ,  rename it
 static struct tm *actual_time; //renamed from t in the original source
 #if DEBUG
 static  struct tm debug_time = {.tm_sec=0, .tm_min=0, .tm_hour=0};
@@ -136,6 +147,7 @@ static void updateLineTo(Line *line, char *value, int delay)
 	TextLayer *tmp = line->nextLayer;
 	line->nextLayer = line->currentLayer;
 	line->currentLayer = tmp;
+	line->currentFontSmall = line->nextFontSmall;
 }
 
 // Check to see if the current line needs to be updated
@@ -143,7 +155,8 @@ static bool needToUpdateLine(Line *line, char *nextValue)
 {
 	const char *currentStr = text_layer_get_text(line->currentLayer);
 
-	if (strcmp(currentStr, nextValue) != 0) {
+	if (strcmp(currentStr, nextValue) != 0 ||
+	    line->currentFontSmall != line->nextFontSmall) {
 		return true;
 	}
 	return false;
@@ -177,27 +190,6 @@ static void configureLayer(TextLayer *textlayer,const char * fontKey )
 	//APP_LOG(APP_LOG_LEVEL_INFO,"bold layer");
 }
 
-/*
-// Configure bold line of text (kr) removed
-static void configureBoldLayer(TextLayer *textlayer)
-{
-	text_layer_set_font(textlayer, fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
-	text_layer_set_text_color(textlayer, GColorWhite);
-	text_layer_set_background_color(textlayer, GColorClear);
-	text_layer_set_text_alignment(textlayer, lookup_text_alignment(text_align));
-	//APP_LOG(APP_LOG_LEVEL_INFO,"bold layer");
-}
-
-// Configure light line of text
-static void configureLightLayer(TextLayer *textlayer)
-{
-	text_layer_set_font(textlayer, fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT));
-	text_layer_set_text_color(textlayer, GColorWhite);
-	text_layer_set_background_color(textlayer, GColorClear);
-	text_layer_set_text_alignment(textlayer, lookup_text_alignment(text_align));
-	//APP_LOG(APP_LOG_LEVEL_INFO,"light layer");
-}
-*/
 // Configure the layers for the given text
 //returns number of lines we need
 static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format[])
@@ -207,45 +199,77 @@ static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format
 	// Set bold layer.
 	int i;
 	int flagWidth = 0;
+  //for layer check
+  //TextLayer * tempLayer  = text_layer_create(GRect(144, 0, 144, 50)); besser in window_load evtl. performance
+
+
 	for (i = 0; i < NUM_LINES; i++) {
 		if (strlen(text[i]) > 0) {
 			if (format[i] == 'b')
 			{
 				configureLayer(lines[i].nextLayer,FONT_KEY_BITHAM_42_BOLD); //Bold for Hours (see in strings... marked with *
+				configureLayer(tempLayer,FONT_KEY_BITHAM_42_BOLD);				
 			}
 			else
 			{
 				configureLayer(lines[i].nextLayer,FONT_KEY_BITHAM_42_LIGHT);
+				configureLayer(tempLayer,FONT_KEY_BITHAM_42_LIGHT);
 			}
+			lines[i].nextFontSmall = 0; //normal
 			//2015-02-12 (kr) try to check size - sieht gut aus, aber es gibt zu wenig fonts
 			//nein, hatte oben getestet, hier werde ich die breite noch nicht haben
 			//stimmt, hab sie nicht - schade, evtl einen text_layer nur zum checken anlegen
-			GSize size = text_layer_get_content_size(lines[i].nextLayer);
-			APP_LOG(APP_LOG_LEVEL_INFO,"height is %i and width %i",size.h,size.w);
-			if (size.w > MAX_WIDTH_PX) //need to fix the font and the line arrangement
-				flagWidth = 1; //need to rearrange
-			//-----------------
-
+			const char* layerText = text_layer_get_text(tempLayer);
+			strcpy((char*)layerText, text[i]);//text_layer_set_tet not necessary
+			//if this layer is marked diry is equal cause it's not visible 
 			
+      //--------------------
+			GSize size = text_layer_get_content_size(tempLayer);
+			APP_LOG(APP_LOG_LEVEL_INFO,"height is %i and width %i",size.h,size.w);
+			if (format[i] != 'b' && size.w > MAX_WIDTH_PX) //need to fix the font and the line arrangement
+			{	 //bold lines could be longer (eg sieben in german)
+			   flagWidth = 1; //need to rearrange	
+			   break;
+			}			
+			//-----------------			
 		}
 		else
 		{
 			break;
-		}
+		}	
 	}
-	numLines = i;
-	
-	int rowHeight = ROW_HEIGHT;
-	if (flagWidth)
-	   rowHeight = ROW_HEIGHT_SMALL;
+	if (flagWidth ) // problems with width of font	
+	{ //one try with smaller font could be later extende to do while and font list 
+		for (i = 0; i < NUM_LINES; i++) //looks ok
+		{
+			if (strlen(text[i]) > 0) {
+				if (format[i] == 'b')
+				{
+					configureLayer(lines[i].nextLayer,FONT_KEY_BITHAM_42_BOLD); //Bold for Hours (see in strings... marked with *
+				}
+				else
+				{
+					configureLayer(lines[i].nextLayer,FONT_KEY_BITHAM_30_BLACK);
+					lines[i].nextFontSmall = 1;
+				}
+			}
+			else
+			{
+				break;
+			}	
+		}		
+	}
 	// Calculate y position of top Line
-	int ypos = (168 - numLines * rowHeight) / 2 - TOP_MARGIN;
-
+	numLines = i;
+	//int ypos = (168 - numLines * ROW_HEIGHT) / 2 - 10; 
+	int ypos = (168 - numLines * ROW_HEIGHT) - 25 ; //absolute position for lines
+	APP_LOG(APP_LOG_LEVEL_INFO,"ypos is %i  ",ypos);
+        
 	// Set y positions for the lines
 	for (int i = 0; i < numLines; i++)
 	{
 		layer_set_frame((Layer *)lines[i].nextLayer, GRect(144, ypos, 144, 50)); //x y w h
-		ypos += rowHeight;
+		ypos += ROW_HEIGHT;
 	}
 
 	return numLines;
@@ -255,7 +279,7 @@ static int time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LIN
 {
 	int length = NUM_LINES * BUFFER_SIZE + 1;
 	char timeStr[length];
-	int delta = time_to_words(lang, hours, minutes, seconds, timeStr, length);
+	int deltaVal = time_to_words(lang, hours, minutes, seconds, timeStr, length);
 	//(kr) 2015-02-12: positve delta: real time is time + n Minutes
 	// Empty all lines
 	for (int i = 0; i < NUM_LINES; i++)
@@ -300,7 +324,7 @@ static int time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LIN
 		start = end + 1;
 		end = strstr(start, " ");
 	}
-	return delta;
+	return deltaVal;
 }
 
 // Update screen based on new time
@@ -310,9 +334,22 @@ static void display_time(struct tm *t)
 	char textLine[NUM_LINES][BUFFER_SIZE];
 	char format[NUM_LINES];
 
-        //(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
-	int delta = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
-	
+	//(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
+	int deltaVal = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
+	if (delta && text_align != TEXT_ALIGN_CENTER)
+	{
+		int xDelta = 0;
+		int yDelta = (168 - 3 * ROW_HEIGHT) - 25; 
+		if (text_align == TEXT_ALIGN_LEFT)
+		    xDelta = 103;
+		if (deltaVal==0)
+			snprintf(deltaLayerText,5," ");
+		else if (deltaVal < 0)
+			snprintf(deltaLayerText,5,"(%i)",deltaVal);
+		else
+			snprintf(deltaLayerText,5,"(+%i)",deltaVal);
+		layer_set_frame((Layer *) deltaLayer,GRect(xDelta,yDelta,41,28));	
+	}
 	//(kr) hier wird übergeben, aber Text nicht gesetzt
 	int nextNLines = configureLayersForText(textLine, format);
 
@@ -364,7 +401,7 @@ static void display_actual_time(struct tm *t)
 // Time handler called every minute by the system
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
-  #if DEBUG==0
+  #if DEBUG==0 //switch off when using debug
 	actual_time = tick_time;
 	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
 	display_time(actual_time);	
@@ -473,12 +510,19 @@ static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tup
 			lang = (Language) new_tuple->value->uint8;
 			persist_write_int(LANGUAGE_KEY, lang);
 			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set language: %i", lang);
-      //was soll das, ich denke sofortige Reaktion? ?
-      
+      //was soll das, ich denke sofortige Reaktion? ?      
 			if (actual_time)
 			{
 				display_time(actual_time);
 			}
+			break;
+			//extensions for v 1.3
+		case DELTA_KEY:
+			delta = new_tuple->value->uint8 == 1;
+			persist_write_bool(DELTA_KEY, delta); //persistent
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set delta: %i", delta ? 1 : 0);
+			break;
+			
 	}
 }
 
@@ -503,6 +547,8 @@ static void init_line(Line* line)
 	// Initially there are no animations
 	line->animation1 = NULL;
 	line->animation2 = NULL;
+	line->currentFontSmall = 0;
+	line->nextFontSmall = 0;
 }
 
 static void destroy_line(Line* line)
@@ -516,7 +562,7 @@ static void window_load(Window *window)
 {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_frame(window_layer);
-  APP_LOG(APP_LOG_LEVEL_INFO, "Window load:  x %i y %i w %i h %i", bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h);
+  //APP_LOG(APP_LOG_LEVEL_INFO, "Window load:  x %i y %i w %i h %i", bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h);
 	//ok, get x 0 y 0 w 144 h 168
 	// Init and load lines
 	for (int i = 0; i < NUM_LINES; i++)
@@ -525,6 +571,15 @@ static void window_load(Window *window)
 		layer_add_child(window_layer, (Layer *)lines[i].currentLayer);
 		layer_add_child(window_layer, (Layer *)lines[i].nextLayer);
 	}
+	tempLayer = text_layer_create(GRect(144, 0, 144, 50));//besser hier, performance?
+	text_layer_set_text(tempLayer,tempLayerText); //sonst hat er keinen speicher
+	layer_add_child(window_layer, (Layer *)tempLayer);
+
+  deltaLayer=text_layer_create(GRect(144,0,41,28));
+	text_layer_set_text(deltaLayer,deltaLayerText); 
+  configureLayer(deltaLayer,FONT_KEY_GOTHIC_28  );
+	layer_add_child(window_layer, (Layer *)deltaLayer);
+  
 
 	inverter_layer = inverter_layer_create(bounds);
 	layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
@@ -539,7 +594,8 @@ static void window_load(Window *window)
 	Tuplet initial_values[] = {
 		TupletInteger(TEXT_ALIGN_KEY, (uint8_t) text_align),
 		TupletInteger(INVERT_KEY,     (uint8_t) invert ? 1 : 0),
-		TupletInteger(LANGUAGE_KEY,   (uint8_t) lang)
+		TupletInteger(LANGUAGE_KEY,   (uint8_t) lang),
+		TupletInteger(DELTA_KEY, (uint8_t) delta ? 1 : 0)
 	};
 
 	app_sync_init(&sync, sync_buffer, sizeof(sync_buffer), initial_values, ARRAY_LENGTH(initial_values),
@@ -552,6 +608,7 @@ static void window_unload(Window *window)
 
 	// Free layers
 	inverter_layer_destroy(inverter_layer);
+  text_layer_destroy(tempLayer);
 	for (int i = 0; i < NUM_LINES; i++)
 	{
 		destroy_line(&lines[i]);
@@ -575,6 +632,12 @@ static void handle_init() {
 		lang = (Language) persist_read_int(LANGUAGE_KEY);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read language from store: %i", lang);
 	}
+	if (persist_exists(DELTA_KEY))
+	{
+		delta =  persist_read_bool(DELTA_KEY);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read delta from store: %i", delta ? 1 : 0);
+	}
+	
 
 	window = window_create();
 	window_set_background_color(window, GColorBlack);

@@ -55,7 +55,10 @@ also bis hier läuft es - schön, gleiche jetzt ab
  logging ist interessant - s APP_LOG in Doku (geht direkt auf notebook
  bei Aufruf von pebble logs, formatierung möglich
  formatierung von zahlen snprintf statt sprintf 
- 
+ typisch also 
+ pebble build
+ pebble install --phone 192.168.2.48
+ pebble logs --phone 192.168.2.48
 
  breite ist laut angabe 144 - bei 142  (bei zwanzig erreicht)
  gibt es aber Stress - dumm gelaufen.
@@ -66,12 +69,12 @@ also bis hier läuft es - schön, gleiche jetzt ab
  (hmm, nicht sicher, doch ich denke schon)
  geschehen, noch stress mit der Zeit, 
  
+ delta zur realen Zeit eingebaut, aber noch icht verwendet.
 
 2015-02-13
   einige kleinigkeiten bearbeitet, debug funktionalitaet funktioniert jetzt
   komplett, Analyse der Aufrufe um die Zeilen darzustellen:
-    IW   tmp (Geändert)
-Row 14   Col 3    2:03  Ctrl-K H for help
+doku:
 function calls for updating lines
 eingerückt -> call in der Funktion
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
@@ -80,13 +83,13 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
     //(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
     int delta = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine,format);
     
-    //(kr) hier wird übergeben, font gesetzt,  aber Text nicht gesetzt
-    int nextNLines = configureLayersForText(textLine, format);
+    //(kr) hier wird text übergeben, font gesetzt,  aber Text nicht gesetzt
+    int nextNLines = configureLayersForText(textLine, format); 
     //(kr) warum funktionalität nicht in der Routine unten umgesetzt, nur
     //wenn update noetig?
     for each line which need to change (or if number of new lines is not equal
                                        number of lines)
-       updateLineTo(&lines[i], textLine[i], delay);
+        updateLineTo(&lines[i], textLine[i], delay);
            updateLayerText(line->nextLayer, value); //hier wird der text gesetzt
            makeAnimationsForLayer(line, delay);
            // then: Swap current/next layers
@@ -94,5 +97,43 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 bevor ich aenderungen am ablauf vornehme mal ein commit
 git add -A 
 git commit
- 
+
+nochmal angeschaut: eine Aenderung am Ablauf ist nicht sinnvoll, da ich 
+alle layer kleiner machen möchte, wenn ein Layer nicht passt, 
+mit ausnahme der bold-face gesetzten layer
+auch wenn man es vielleicht optimieren könnte - lasse den ablauf genau so,
+versuche statt dessen einen temporaeren textlayer zu nutzen, um die 
+groesse bzw. breite des textes zu finden und die layer entsprechend 
+zu konfigurieren -> also erstmal 
+git checkout -- src/TextWatch.c
+(aenderungen weg)
+bin diesen weg gegangen, laeuft so weit, habe noch zwei variablen eingebaut
+um einen font-Wechsel zu detektieren
+-------------------------------------------------
+2015-02-14 anschauen, wie man optionen setzen kann 
+  
+  javascript teil gehört zur app, wird auf dem smartphone in einer sandbox
+	ausgeführt. Beispiel nutzt jquery - nett, das das geht, Erweiterung um
+  schaltbares delta ist trivial
+  uups wohl doch nochmal schauen, es gibt noch eine js und die html wird
+	nicht angezeigt, wenn ich einfach nur installiere, aenderungen fehlen
+  sieht so aus, als wuerde die Seite nicht an die app auf dem phone
+	uebergeben sondern in js steht, das eine Seite im Web gerufen wird
+  hmm, strange, steht aber auch so in der doku
+  zu hoffen ist dass die pebble app die Seite zwischenspeichert
+  nee, ich glaube nicht
+  evtl. bietet sich auch
+	http://developer.getpebble.com/blog/2013/11/21/Using-PebbleKit-JS-Configuration/
+  an - config selbst bauen. Da ich hier aber auf einem Projekt aufbaue 
+  werde ich die gegebene anpassen
+
+	auf c Seite scheint es die tuplet geschichte zu sein (AppMessages)
+  aufruf von app_sync_init setzt die handler (hhm de_init unnötig? nein
+  passiert in window_unload)
+  gespeichert lokal in einem persist_storage, laden in handle_init
+  - auch erledigt fuer delta
+
+  textlayer fuer delta bauen (ohne Animation) positionierung und groesse
+  mit ui designer in der pebble cloud
+  
  

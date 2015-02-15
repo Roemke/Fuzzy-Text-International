@@ -1,4 +1,4 @@
-var VERSION = "1.2.1";
+var VERSION = "1.3";
 
 var isReady = false;
 var callbacks = [];
@@ -32,7 +32,7 @@ function readyCallback(event) {
 function showConfiguration(event) {
   onReady(function() {
     var opts = getOptions();
-    var url  = "http://static.sitr.us.s3-website-us-west-2.amazonaws.com/configure-fuzzy-text.html";
+    var url  = "http://zb42.de/pebble/configure-fuzzy-text.html";
     Pebble.openURL(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
   });
 }
@@ -44,7 +44,10 @@ function webviewclosed(event) {
   var options = JSON.parse(resp);
   if (typeof options.invert === 'undefined' &&
       typeof options.text_align === 'undefined' &&
-      typeof options.lang === 'undefined') {
+      typeof options.lang === 'undefined' &&
+      typeof options.delta === 'undefined') 
+      
+  {
     return;
   }
 
@@ -74,7 +77,8 @@ function prepareConfiguration(serialized_settings) {
   return {
     "0": settings.invert ? 1 : 0,
     "1": alignments[settings.text_align],
-    "2": langs[settings.lang]
+    "2": langs[settings.lang],
+    "3": settings.delta ? 1 : 0
   };
 }
 
@@ -100,9 +104,11 @@ function onReady(callback) {
   }
 }
 
-Pebble.addEventListener("ready", readyCallback);
+//we need three Listeners
+Pebble.addEventListener("ready", readyCallback); //called when app is loaded on watch
 Pebble.addEventListener("showConfiguration", showConfiguration);
 Pebble.addEventListener("webviewclosed", webviewclosed);
+
 
 onReady(function(event) {
   var message = prepareConfiguration(getOptions());
