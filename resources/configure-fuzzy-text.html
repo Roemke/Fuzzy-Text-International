@@ -1,253 +1,492 @@
 <!DOCTYPE html>
 <head>
-
+	<!-- page must be copied to a webserver -->
 	<!-- Basic Page Needs
-  ================================================== -->
+	================================================== -->
 	<meta charset="utf-8">
 	<title>Configure Fuzzy Text</title>
 	<meta name="description" content="configuration page for Fuzzy Text International
-  S & T version , a Pebble watchface">
+	S & T version , a Pebble watchface">
 
 	<!-- Mobile Specific Metas
-  ================================================== -->
+	================================================== -->
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
-	<!-- CSS hmmm bootstrap is not really small - necesssary for simple
-	configuration ?
-  ================================================== -->
-  <!-- check without 
-	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
-  -->
+	<!-- use jquery mobile -->
+	<link rel="stylesheet" type="text/css" href="js/jquerymobile/jquery.mobile-1.4.4.min.css">
+	<script src="js/jquery-1.11.0.min.js" type="text/javascript"></script>
+	<style type="text/css">
+		.hidden {
+			display: none;
+		}
+		.bg-info, .bg-danger {
+			border: 1px solid #111;
+			padding: 2px;
+			width: 90%;
+			background-color: #fafffa;
+			margin-left: auto;
+			margin-right: auto;
+		}
+		.bg-danger {
+			background-color: #fffafa;
+		}
+
+		table {
+			border-collapse: collapse;
+		}
+		thead tr {
+			border-top: 1px solid black;
+			border-bottom: 1px solid black;
+		}
+		#ttPage table td {
+			text-align: center;
+		}
+		.fullwidth {
+			width: 100%;
+		}
+	</style>
+	<!-- change it to own hosted jquery script -->
+	<script type = "text/javascript">
+	var getObject = {};
+	var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    var dayKeys = [1000,2000,3000,4000,5000,6000,7000];
+	var LATEST = "1.3";
+
+	function saveOptions() {
+		var params = {}; //read content of #config as array
+		$('#config').serializeArray().forEach(function(pair) {
+		params[pair.name] = pair.value;
+		//$('#out').append(pair.name + " = " + pair.value + "<br>");
+		});
+		//so we have all data which is given in the form
+		//#config array to options object
+		var options =
+		{
+			invert:		params.invert === 'on',
+			text_align:	params.align || 'center',
+			lang:		params.lang,
+			delta:  params.delta === 'on',
+			battery: params.battery === 'on',
+			warnown: params.warnon === 'on'
+		};
+		//now read the table data
+		/*
+		options.timeTable = {};//need to be object, new Array does not work, think array is index based, no strings possible
+		//JSON.stringify has problems with new Array instead of object 
+		for (var i = 0; i < days.length; ++i)
+		{
+			var tableRows = $('#tt'+days[i] + ' tr');
+			if (tableRows.length > 1) //have entries 
+			{
+				options.timeTable[days[i]] = new Array();
+				for (var j= 1; j < tableRows.length; ++j)
+				{
+					var tds = $(tableRows[j]).find('td');
+					options.timeTable[days[i]][j-1]={'start': $(tds[0]).html(), 
+					                     'end':   $(tds[1]).html(),
+					                     'own': $(tds[2]).find('input').prop('checked') 
+					                     };
+				}
+			}	
+		
+		console.log(options); //ok, is nice and can be serialized, but this form has to be converted
+		//on pebble-js-app to  send via bluetooth, 
+		//so I would say I start on 1000 for Monday, 2000 for thursday and so on to have a key for the
+		//dates no, I cant't do it with AppSync, nevertheless I transfer it here and in pebble-js-app 
+		//I can count the entries and store them
+		*/
+		for (var i = 0; i < days.length; ++i)
+		{
+			var tableRows = $('#tt'+days[i] + ' tr');
+			if (tableRows.length > 1) //have entries 
+			{
+				var start = dayKeys[i];
+				for (var j= 1; j < tableRows.length; ++j)
+				{
+					var tds = $(tableRows[j]).find('td');
+					options[start + 3*(j - 1)    ] = $(tds[0]).html();
+					options[start + 3*(j - 1) +1 ] = $(tds[1]).html();
+					options[start + 3*(j - 1) +2 ] = $(tds[2]).find('input').prop('checked') ? 1 : 0;
+				}  
+			}
+		}			
+		return options;
+	}
+
+//first called
+	function applyOptions() {
+		var $form	= $('#config');
+		var opts	= getObject.options;
+		//$('#out').append(JSON.stringify(opts));
+		//options coming from caller of this page - stored on phone I think,
+		//yes, call is coming from pebble-js-app
+		if (opts && opts.invert) {
+			$form.find('[name="invert"]').prop('checked', true).checkboxradio('refresh');
+		}
+		if (opts && opts.text_align) {
+			$form.find('[name="align"]').filter(function(i, btn) {
+				return btn.value === opts.text_align;
+			}).prop('checked', true);
+		
+		$form.find('[name="align"]').checkboxradio('refresh');
+		}
+		if (opts && opts.lang) {
+			$form.find('[name="lang"]').filter(function(i, btn) {
+				return btn.value === opts.lang;
+			}).prop('checked', true).checkboxradio('refresh');
+			$form.find('[name="lang"]').checkboxradio('refresh');
+		}
+		if (opts && opts.delta) {
+			$form.find('[name="delta"]').prop('checked', true).checkboxradio('refresh');
+		}
+		if (opts && opts.battery) {
+			$form.find('[name="battery"]').prop('checked', true).checkboxradio('refresh');
+		}
+		if (opts && opts.warnown) {
+			$form.find('[name="warnown"]').prop('checked', true).checkboxradio('refresh');
+		}
+	}
+//getObject aus get-string fuellen
+function fillGetObject()
+{
+	var getString = window.location.hash.substring(1); //without #
+	//only handle &, fits our needs, split should be faster then regexp
+	//and more understable
+	//$('#out').append(getString+'<br>');
+	var getArr = getString.split('&');
+	for (var i = 0; i < getArr.length; ++i)
+	{
+		var pair = getArr[i].split('=');
+		if (pair.length != 2) continue
+		getObject[pair[0]] = JSON.parse(decodeURIComponent(pair[1]));
+		//hmm, mit 1.3.1 (eh nicht erlaubt) gibt es aerger
+		//vielleicht hat original-autor deshalb speziellen parse-Ausdruck
+		//veraendert
+		//$('#out').append('<br>'+pair[0]);
+		// filling global getObject
+		//hmm found:decodeURIComponent(p[1].replace(/\+/g, " "));
+		//should be not necessary here
+	}
+	if (getObject && getObject.v)
+		getObject.v = getObject.v.toString();
+}
+
+function parseVersion(verStr) {
+	var parts = verStr.split('.');
+	return parts.reduce(function(sum, part) {
+		return (sum * 1000) + parseInt(part, 10);
+			}, 0);
+}
+
+//first bind on mobileinit and after that load jquery mobile, no use
+//pagecreate
+$(document).on('pagecreate','#optionPage', function() {
+//	console.log('pagecreate fired');
+	fillGetObject();
+	
+	var version = getObject.v;
+	//$('#out').append("Version is " + version+'<br>');
+	//$('#out').append("Opt " + JSON.stringify(getObject.options) +'<br>');
+	
+	if (!version || (parseVersion(version) < parseVersion(LATEST))) {
+		$('#update-available').removeClass('hidden');
+	}
+	else {
+		$('#up-to-date').removeClass('hidden');
+	}
+	//$('#out').append(getObject.options.text_align);
+	//$('#out').append("<br> v=" + getObject.v);
+	//ok, works
+	applyOptions();
+	$(document).on("vclick",".b-submit",function() {
+		var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(saveOptions()));
+		//console.log(location);
+		document.location = location;
+	});
+	$(document).on("vclick",".b-cancel",function() {
+		var location = "pebblejs://close";
+		document.location = location;
+	});
+});
+	</script>
+
+	<script src="js/jquerymobile/jquery.mobile-1.4.4.min.js" type="text/javascript"></script>
 
 </head>
 <body>
-
 	<!-- Primary Page Layout
 	================================================== -->
-
-	<div class="container">
-		<header>
-			<h1>Configure Fuzzy Text Int'l</h1>
-		</header>
-		
-		<div id="update-available" class="hidden bg-danger" style="padding:0.75em">
-			<p>There is a new version of Fuzzy Text International S &amp; T
-			available - some settings will not work until you update to
-			the new version. <a href="CHANGES.html">See
-			details</a></p>
+	<div data-role="page" id="optionPage">
+		<div data-role="header">
+			<h1>Configure Fuzzy Text Int'l Student &amp; Teacher version</h1>
+			Configuration utility for the Student &amp; Teachers version of Fuzzy
+			Text International
 		</div>
+		<div data-role="content">
+			<div id="update-available" class="hidden bg-danger">
+				There is a new version of Fuzzy Text International S &amp; T
+				available - some settings will not work until you update to
+				the new version. <a href="CHANGES.html">See
+				details</a>
+			</div>
 
-		<div id="up-to-date" class="hidden bg-info" style="padding:0.75em">
-			<p>Your version of Fuzzy Text International is up-to-date.
-			<a href="CHANGES.html">See changes</a></p>
-		</div>
+			<div id="up-to-date" class="hidden bg-info" >
+				Your version of Fuzzy Text International is up-to-date.
+				<a href="CHANGES.html">See changes</a>
+			</div>
 
-		<form id="config" role="form" class="input-lg">
+			<div id='out' class='bg-info hidden'></div>
 
-			<fieldset>
-				<legend>Colors:</legend>
-				<div class="checkbox">
-					<label>
-						<input type="checkbox" name="invert" value="on" />
-						invert colors
-					</label>
-				</div>
-			</fieldset>
-
-			<fieldset>
-				<legend>Text align:</legend>
-				<div class="radio-inline">
-					<label>
-						<input type="radio" name="align" value="left" />
-						left
-					</label>
-				</div>
-				<div class="radio-inline">
-					<label>
-						<input type="radio" name="align" value="center" checked />
-						center
-					</label>
-				</div>
-				<div class="radio-inline">
-					<label>
-						<input type="radio" name="align" value="right" />
-						right
-					</label>
-				</div>
-			</fieldset>
-
-			<fieldset>
-				<legend>Language:</legend>
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="ca" />
-						Català
-					</label>
+			<form id="config">
+				<fieldset data-role="controlgroup">
+					<legend style="margin-top:5px;">
+						Display Options:
+					</legend>
+						<label>
+							<input type="checkbox" name="invert" value="on" />
+							invert colors </label>
+						<label>
+							<input type="checkbox" name="delta" value="on" />
+							show delta to exact time </label>
+						<label>
+							<input type="checkbox" name="battery" value="on" />
+							show line which indicates battery status </label>
+				</fieldset>
+				<div data-role="controlgroup">
+						<label>
+							<input type="checkbox" name="showtime" value="on" />
+							Show minutes which have passed and remaining minutes
+							according to the defined intervals / lessons. </label>
+						<label>
+							<input type="checkbox" name="warnown" value="on" />
+							Warn with vibration 5 minutes before own lesson starts. </label>
 				</div>
 
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="de" />
-						Deutsch
-					</label>
-				</div>
+				<fieldset data-role="collapsible">
+					<legend>
+						Alignment
+					</legend>
+					<div data-role="controlgroup">
+						<div  style="margin-top:5px">
+							<label>
+								<input type="radio" name="align" value="left" />
+								align left </label>
+						</div>
+							<label>
+								<input type="radio" name="align" value="center" checked />
+								align center </label>
+							<label>
+								<input type="radio" name="align" value="right" />
+								align right </label>
+					</div>
+				</fieldset>
 
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="en_GB" />
-						English (Great Britain)
-					</label>
-				</div>
-
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="en_US" checked />
-						English (United States)
-					</label>
-				</div>
-
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="es" />
-						Español
-					</label>
-				</div>
-
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="fr" />
-						Français
-					</label>
-				</div>
-
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="no" />
-						Norsk
-					</label>
-				</div>
-
-				<div class="radio">
-					<label>
-						<input type="radio" name="lang" value="sv" />
-						Svenska
-					</label>
-				</div>
-			</fieldset>
-			<fieldset>
-				<legend>Time options:</legend>
-				<div class="checkbox">
-					<label>
-						<input type="checkbox" name="delta" value="off" />
-						show delta to exact time
-					</label>
-					If switched to on there will be added a text-layer which shows
-					the difference from the fuzzy time to the exact time: exact -
-					fuzzy in minutes. Layout must be
-					left or right to show the delta. Position is in next-to-last line.  
-				</div>				
-			</fieldset>
-			<fieldset>
-				<legend>Technical options:</legend>
-				<div class="checkbox">
-					<label>
-						<input type="checkbox" name="battery" value="off" />
-						show line which indicates battery status
-					</label>
-				</div>				
-			</fieldset>
-				              
-			<fieldset>
-				<a href="pebblejs://close" class="btn btn-lg btn-default" role="button">Cancel</a>
-				<button type="button" class="btn btn-lg btn-primary" id="b-submit">Save</button>
-			</fieldset>
-		</form>
-
-	</div><!-- container -->
-
-<!-- End Document
-================================================== -->
-  <!-- change it to own hosted jquery script -->
-	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+				<fieldset style="margin-top:5px;" data-role="collapsible">
+					<legend>
+						Language
+					</legend>
+					<div data-role="controlgroup">
+							<label>
+								<input type="radio" name="lang" value="ca" />
+								Català </label>
+							<label>
+								<input type="radio" name="lang" value="de" />
+								Deutsch </label>
+							<label>
+								<input type="radio" name="lang" value="en_GB" />
+								English (Great Britain) </label>
+							<label>
+								<input type="radio" name="lang" value="en_US" checked />
+								English (United States) </label>
+							<label>
+								<input type="radio" name="lang" value="es" />
+								Español </label>
+							<label>
+								<input type="radio" name="lang" value="fr" />
+								Français </label>
+							<label>
+								<input type="radio" name="lang" value="no" />
+								Norsk </label>
+							<label>
+								<input type="radio" name="lang" value="sv" />
+								Svenska </label>
+					</div>
+				</fieldset>
+			</form>
+		</div><!-- data-role content -->
+		<div data-role="footer">
+			<div data-role="navbar">
+				<ul>
+					<li>
+						<a data-role="button"   class="b-cancel">Cancel</a>
+					</li>
+					<li>
+						<a data-role="button"   href='#ttPage'>Time Table</a>
+					</li>
+					<li>
+						<a data-role="button"   class="b-submit">Save</a>
+					</li>
+				</ul>
+			</div>
+		</div><!-- /footer -->
+	</div>
+	<!-- page ende -->
 	<script>
-		var LATEST = "1.3";
-
-		function saveOptions() {
-			var params = {}; //read content of #config as array 
-			$('#config').serializeArray().forEach(function(pair) {
-				params[pair.name] = pair.value;
+		$(document).on('pagebeforecreate', '#ttPage', function() {
+			var i = 0;
+			$('#ttContent fieldset.day').each(function()//append tables
+			{
+				$(this).append("<table class='fullwidth' id='tt" + days[i] + "'>" + 
+				"	<tr><th>Start</th><th>End</th><th>Own</th>" + 
+				"   <th><button id='bPlus" + days[i++] + 
+				" 'class='ui-btn ui-icon-plus ui-btn-icon-notext  ui-btn-inline '> </button></th>" + 
+				"   <th>   </th></tr>" + "</table>");
 			});
+			//event handler to every table - only seven eventhandlers are created
+			//see delegate events in jquery
+			$('#ttContent fieldset.day table').on('click', 'button.ui-icon-plus', function() {
+				var id = $(this).attr('id');
+				var day = id.substring(5);
+				var table = '#tt' + day;
+				var parent = $(this).parents('tr');
+				$('#popUpOk').off();
+				$('#popUpOk').on('vclick', function() {
+					//console.log("popup closed with ok");
+					var checked = $('#ownLesson').prop('checked') ? 'checked' : '';
+					var stime = $('#startTime').val() ;
+					var dtStime = new Date(2015,01,01,stime.split(':')[0],stime.split(':')[1] );
+					var inserted = false; //insert time so that the table stay sorted
+					var insertionString = "<tr class='time-data' ><td>"  +stime +  "</td>" + 
+								"<td>" + $('#endTime').val() + "</td>" + "<td>" + 
+								 '<div class="checkbox"><input type="checkbox" value="on" ' + checked + ' ></div> </td>' + //checkbox if own
+								 "<td><button id='bMinus" + day + 
+								 "' class='ui-btn ui-icon-minus ui-btn-icon-notext  ui-btn-inline '> </button></td></tr>"
+					
+					var trs = $(table +' tr.time-data');                   
+				    trs.each(function()
+				    {
+				    	
+						//console.log($(this).html());
+						var aktStime = $(this).find('td').first().html();
+						var dtAktStime = new Date(2015,01,01,aktStime.split(':')[0],aktStime.split(':')[1] );
+						//console.log("dtStime " + dtStime);
+						//console.log("dtAktStime " + dtAktStime);
+						if (dtStime < dtAktStime) //insertion sort, dAktStime is greater then dtStime 
+						{ //if each traverse from left to right, I should have the position
+							inserted = true;
+							$(this).before(insertionString);
+							return false; //stops each loop? - it should
+						}						
+					});
+					if (!inserted)
+					{  //then at the end of the rows, first call - behind th row
+						$(table +' tr').last().after(insertionString); 
+					}
+				});
+				$('#timeDialog').popup('open');
 
-      //#config array to options object
-			var options = {
-				invert:		params.invert === 'on',
-				text_align:	params.align || 'center',
-				lang:		params.lang,
-				delta:  params.delta === 'on'
-			}
-			return options;
-		}
-
-    //first called 
-		function applyOptions() {
-			var $form	= $('#config');
-			var opts	= JSON.parse(getParam('options')); 
-			//options coming from caller of this page - stored on phone I think,
-			//yes, call is coming from pebble-js-app
-			if (opts && opts.invert) {
-				$form.find('[name="invert"]').prop('checked', true);
-			}
-			if (opts && opts.text_align) {
-				$form.find('[name="align"]').filter(function(i, btn) {
-					return btn.value === opts.text_align;
-				}).prop('checked', true);
-			}
-			if (opts && opts.lang) {
-				$form.find('[name="lang"]').filter(function(i, btn) {
-					return btn.value === opts.lang;
-				}).prop('checked', true);
-			}
-			if (opts && opts.delta) {
-				$form.find('[name="delta"]').filter(function(i, btn) {
-					return btn.value === opts.delta;
-				}).prop('checked', true);
-			}
-		}
-
-    //options are transferred via get I think
-		function getParam(key) {
-			var params = window.location.hash;
-			var val;
-			params.replace(/(?:^|[#&])([a-z]+)=([^&]+)/ig, function(_, k, v) {
-				if (key === k) {
-					val = decodeURIComponent(v);
-				}
 			});
-			return val;
-		}
-
-		function parseVersion(verStr) {
-			var parts = verStr.split('.');
-			return parts.reduce(function(sum, part) {
-				return (sum * 1000) + parseInt(part, 10);
-			}, 0);
-		}
-
-		$("#b-submit").click(function() {
-			var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(saveOptions()));
-			document.location = location;
+			//and click on - Button
+			$('#ttContent fieldset.day table').on('click', 'button.ui-icon-minus', function() {
+				var id = $(this).attr('id');
+				var day = id.substring(5);
+				var table = '#tt' + day;
+				var parent = $(this).parents('tr');
+				parent.remove();
+			});
 		});
+	</script>
+	<div data-role="page" id='ttPage'>
+		<!-- page for time table -->
+		<!-- time table -->
+		<div data-role="header">
+			<h1>Time Table</h1>
+		</div>
+		<!-- header -->
+		<div data-role="content" id='ttContent'>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Monday (intervals)
+				</legend>
+			</fieldset>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Tuesday (intervals)
+				</legend>
+			</fieldset>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Wednesday (intervals)
+				</legend>
+			</fieldset>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Thursday (intervals)
+				</legend>
+			</fieldset>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Friday (intervals)
+				</legend>
+			</fieldset>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Saturday (intervals)
+				</legend>
+			</fieldset>
+			<fieldset data-role="collapsible" class='day'>
+				<legend>
+					Sunday (intervals)
+				</legend>
+			</fieldset>
+		</div><!-- content -->
 
-		var version = getParam('v');
-		if (!version || (parseVersion(version) < parseVersion(LATEST))) {
-			$('#update-available').removeClass('hidden');
-		}
-		else {
-			$('#up-to-date').removeClass('hidden');
-		}
+		<div data-role="footer">
+			<div data-role="navbar">
+				<ul>
+					<li>
+						<a data-role="button"   class="b-cancel">Cancel</a>
+					</li>
+					<li>
+						<a data-role="button"   href='#optionPage'>Option</a>
+					</li>
+					<li>
+						<a data-role="button"   class="b-submit">Save</a>
+					</li>
+				</ul>
+			</div>
+			<!-- navbar -->
+		</div><!-- /footer -->
+		<!-- pop up needs to be in same page, here it is now problem, need dialog only on this page -->
+		<div data-role='popup' id='timeDialog' data-dismissible='false'>
+			<div data-role="header" data-theme="a">
+				<h1>Input Time</h1>
+			</div>
+			<div role="main" class="ui-content">
+				Start- and End-Time of the entry.
+				<form>
+					<div data-role="fieldcontain">
+						<label>Start:
+							<input id='startTime' type="time">
+						</label>
+						<label>End:
+							<input id='endTime' type="time">
+						</label>
+						<label>Own
+							<input id='ownLesson' type="checkbox">
+						</label>
+					</div>
+				</form>
+				<a href="#" class="ui-btn ui-corner-all ui-shadow ui-btn-inline ui-btn-b" data-rel="back">Cancel</a>
+				<a href="#" id='popUpOk' class="ui-btn ui-corner-all ui-shadow ui-btn-inline ui-btn-b" data-rel="back" data-transition="flow">Ok</a>
+			</div>
+		</div>
+	</div>
+	<!-- end of ttPage -->
 
-		applyOptions();
-   </script>
+	</div>
+	<!-- End Document
+	================================================== -->
 
 </body>
 </html>

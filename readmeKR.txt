@@ -136,4 +136,28 @@ um einen font-Wechsel zu detektieren
   textlayer fuer delta bauen (ohne Animation) positionierung und groesse
   mit ui designer in der pebble cloud
   
- 
+2015-02-17 ein wenig gespielt, einige optionen dazu viel an javascript fuer
+  die timetable getan
+  lange gebraucht: buffer probleme wenn zu viele Optionen, hatte
+   app_messag_open übersehen, dort war der buffer auch auf 64 gesetzt, 
+   der war ebenfalls zu klein, maximale groessen wurden mit 
+   max outbox 656 max inbox 2026
+   im log ausgegeben 
+
+Pebble SDK provides a static minimum guaranteed size
+(APP_MESSAGE_INBOX_SIZE_MINIMUM and APP_MESSAGE_OUTBOX_SIZE_MINIMUM).
+Requesting a buffer of the minimum guaranteed size (or smaller) is always
+guaranteed to succeed on all Pebbles in this SDK version or higher, and with
+every phone.
+
+In some context, Pebble might be able to provide your application with
+larger inbox/outbox. You can call app_message_inbox_size_maximum() and
+app_message_outbox_size_maximum() in your code to get the largest possible
+value you can use.
+
+hmmm, ich habe den Eindruck, dass ich von der einfachen variante mit 
+AppSync wechseln muss auf AppMessage - kommunikation ist flexibler
+
+vorher mal eine kopie einer halbwegs funktionierenden kommunikation machen
+- geschehen, prinzipiell laeuft das watchface, nicht natuerlich die 
+timetable geschichte
