@@ -489,6 +489,7 @@ void   handleIntervalSettings(struct tm *t, bool done, bool warnown)
     } //end of done
     else
     {
+      //APP_LOG(APP_LOG_LEVEL_INFO,"set hidden");
       layer_set_hidden((Layer *) doneLayerL,true);
       layer_set_hidden((Layer *) doneLayerR,true);
     }
@@ -1102,6 +1103,11 @@ static void tap_handler(AccelAxisType axis, int32_t direction) {
       warnown = ! warnown;
     }
     first = ! first;
+    if (!done)
+    {
+      layer_set_hidden((Layer *) doneLayerL,true);
+      layer_set_hidden((Layer *) doneLayerR,true);
+    }
     if (actual_time)
       display_time(actual_time);
   } 
