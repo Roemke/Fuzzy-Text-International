@@ -1,5 +1,5 @@
 
-Fuzzy Text International Student & Teacher Version, by Karsten Roemke
+Fuzzy Text International Student & Teacher Version
 ========================
 This is heavily based on Fuzzy Text International from Jesse Hallett and
 others 
