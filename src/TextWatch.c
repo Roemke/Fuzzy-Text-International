@@ -2,9 +2,10 @@
 
 #include "num2words.h"
 
-#define DEBUG 0 
+#define DEBUG 0
 //if debug to 1 appinfo.json.watchapp has to be used - not sure, but nearly :-)
-#define MAX_WIDTH_PX 130  //kr  
+//so copy it 
+#define MAX_WIDTH_PX 140  //kr  
 
 //for function calls when updating lines see readmeKR.txt
 //maybe I need to change the original flow because of the font
@@ -17,15 +18,14 @@
 #define ROW_HEIGHT_SMALL 30 //kr
 
 //define keys for persistence on pebble, need match in pebble-js-app
-#define INVERT_KEY 0
+#define TIMETABLE_KEY 0 //how many entries in timetable
 #define TEXT_ALIGN_KEY 1
 #define LANGUAGE_KEY 2
 #define DELTA_KEY 3   
 #define DONE_KEY 4  //show minutes done   
 #define BATTERY_KEY 5 // battery bar 
 #define WARNOWN_KEY 6 // warning / vibration 5 minutes before own lessen 
-#define TIMETABLE_KEY 10 // does timetable exist / have to get them from phone
-//#define DATA_KEY 12 // one dataset for timetable
+#define INVERT_KEY 10 
 
 //-----------------
 
@@ -44,8 +44,6 @@
 // We can add a new word to a line if there are at least this many characters free after
 #define LINE_APPEND_LIMIT (LINE_LENGTH - LINE_APPEND_MARGIN)
 
-static AppSync sync;
-static uint8_t sync_buffer[124]; //(kr) was 64
 
 static int text_align = TEXT_ALIGN_CENTER;
 static bool invert = false;
@@ -54,7 +52,7 @@ static bool delta = false; //kr options static, oh c kann bool dachte waere c++
 static bool done = false; //show minutes done and left
 static bool battery = true; //show bar to indicate accu
 static bool warnown = false;
-static int timetable = 0; //how many entries in the TimeTable
+static int tt_entries = 0; //how many entries in the TimeTable
  
 static Language lang = EN_US;
 
@@ -71,6 +69,17 @@ typedef struct {
 	unsigned int nextFontSmall;
 } Line;
 
+typedef struct TTEntry 
+{
+  unsigned int startMin;
+  unsigned int endMin;
+  unsigned int position; //wo muesste der eintrag stehen
+  bool own;
+  struct TTEntry * next;
+} TTEntry;
+
+static TTEntry * ttPerDay[]={0,0,0,0,0,0,0}; //7 Listen fuer die Tage
+
 static Line lines[NUM_LINES];
 static InverterLayer *inverter_layer;
 
@@ -80,12 +89,13 @@ char tempLayerText[BUFFER_SIZE];
 static TextLayer * deltaLayer; 
 char deltaLayerText[]="(+0)"; // ( sign digit ) \0 without spaces 
 
-static TextLayer * doneLayer; 
-static char doneLayerText[]="           "; 
+static TextLayer * doneLayerL; 
+static TextLayer * doneLayerR; 
+static char doneLayerTextL[12]=""; 
+static char doneLayerTextR[12]=""; 
 
 static Layer * batteryLayer;
 
-static char tt_data[24]=""; 
 //static time was *t ,  rename it
 static struct tm *actual_time; //renamed from t in the original source
 #if DEBUG
@@ -368,20 +378,14 @@ static int time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LIN
 	return deltaVal;
 }
 
-// Update screen based on new time
-static void display_time(struct tm *t)
+
+//if delta is own we schould show the difference from exact time
+void handleDeltaToExact(bool delta, int deltaVal)
 {
-	// The current time text will be stored in the following strings
-	char textLine[NUM_LINES][BUFFER_SIZE];
-	char format[NUM_LINES];
-
-	//(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
-	int deltaVal = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
-
-	if (delta )//&& text_align != TEXT_ALIGN_CENTER)
+	if (delta )
 	{
 		if (deltaVal==0)
-			snprintf(deltaLayerText,5," ");
+			snprintf(deltaLayerText,5," * ");
 		else if (deltaVal < 0)
 			snprintf(deltaLayerText,5,"(%i)",deltaVal);
 		else
@@ -395,6 +399,134 @@ static void display_time(struct tm *t)
 		layer_set_hidden((Layer *) deltaLayer,true);
 		//layer_mark_dirty((Layer *) deltaLayer);
 	}	
+  layer_mark_dirty((Layer *) deltaLayer); //sicher gehen
+}
+
+
+void   handleIntervalSettings(struct tm *t, bool done, bool warnown)
+{
+  //APP_LOG(APP_LOG_LEVEL_INFO,"Done is %i warnown is %i weekday %i",done ? 1 : 0, 
+    //                        warnown ? 1 : 0, (t->tm_wday +6 )%7);
+
+  if (warnown || done) //otherwise nothing to do 
+  {
+    //search for matching interval
+    unsigned int minutes = t->tm_hour * 60 + t->tm_min;
+    int tmMyDow = (t->tm_wday + 6 ) % 7; 
+    TTEntry * akt = ttPerDay[tmMyDow];
+    TTEntry * prev = akt;                           
+    while (akt && akt->startMin < minutes)
+    {
+      prev = akt;
+      akt= akt->next;
+    }
+    /*APP_LOG(APP_LOG_LEVEL_INFO,"Done is %i warnown is %i minutes is %i ",done ? 1 : 0, 
+                           warnown ? 1 : 0, minutes);
+    if (prev)
+      APP_LOG(APP_LOG_LEVEL_INFO,"have prev with start %i", prev->startMin );
+    if (akt)
+      APP_LOG(APP_LOG_LEVEL_INFO,"have akt with start %i", akt->startMin );
+    */                      
+    
+    if (done)
+    {
+      layer_set_hidden((Layer *) doneLayerL,false);
+      layer_set_hidden((Layer *) doneLayerR,false);
+      if ( prev && prev->startMin <= minutes && minutes <= prev->endMin)
+      { //bin im Intervall
+        snprintf(doneLayerTextL,12,"%i",minutes - prev->startMin);
+        snprintf(doneLayerTextR,12,"%i", prev->endMin - minutes );
+      }
+			else  //outside interval show time to next lesson
+			{
+        layer_set_hidden((Layer *) doneLayerR,true); //hidden
+        //if we show time left, move the delta layer to right side  
+        text_layer_set_text_alignment(deltaLayer,GTextAlignmentRight);           
+        
+			  int minutesLeft=0;
+			  int fullDays = 0;
+			  if (akt)
+			  {                  //have interval on same day
+			    minutesLeft = akt->startMin - minutes; 
+			  }
+			  else                     //next interval on another day
+			  {
+			    int counter = 0;
+			    do
+			    {
+			      akt = ttPerDay[( tmMyDow + ++counter) % 7];//einen weiter 
+			    }while(! akt && counter < 7 );  //fr sa so mo di mi do fr 
+			                                    //   1  2  3  4  5  6  7
+			                                    //4  5  6  0  1  2  3  4
+			    fullDays = counter -1; 
+          if (akt) //points to first entry on day
+          {
+             minutesLeft += 1440 - minutes; //on this day
+             minutesLeft += akt->startMin;  //on day with interval
+          }
+			  }// eo int on another day
+        if (fullDays || minutesLeft)
+        {
+          int hours = minutesLeft / 60;
+          int daysFromH = 0;
+          if (hours > 23)
+          {
+            daysFromH = hours / 24;
+            hours = hours - daysFromH * 24;
+            fullDays += daysFromH; 
+          }   
+          minutesLeft -= ( 60 * hours + daysFromH * 1440) ;
+          doneLayerTextL[0] = '\0';
+          if (fullDays)
+            snprintf(doneLayerTextL,12,"%id",fullDays);
+          if (hours > 0 || fullDays)
+            snprintf(doneLayerTextL+strlen(doneLayerTextL), 12-strlen( doneLayerTextL),
+                    "%ih",hours);
+          snprintf(doneLayerTextL+strlen(doneLayerTextL), 12-strlen( doneLayerTextL),
+                    "%i",minutesLeft);             
+        }                       
+			}// ouside interval, show time left until next lesson starts
+    } //end of done
+    else
+    {
+      layer_set_hidden((Layer *) doneLayerL,true);
+      layer_set_hidden((Layer *) doneLayerR,true);
+    }
+    layer_mark_dirty((Layer *) doneLayerL); 
+    layer_mark_dirty((Layer *) doneLayerR); 
+  
+    if (akt  && akt->startMin - minutes == 5 && warnown && akt->own ) //5 Minuten vorher (konfigurierbar machen?)
+    {
+       //vibrieren
+       static const uint32_t const segments[] = {100, 100, 300 };
+       VibePattern pat = {
+         .durations = segments,
+           .num_segments = ARRAY_LENGTH(segments),
+       };
+       vibes_enqueue_custom_pattern ( pat);
+    }
+  } 
+}
+
+// Update screen based on new time
+static void display_time(struct tm *t)
+{
+	// The current time text will be stored in the following strings
+	char textLine[NUM_LINES][BUFFER_SIZE];
+	char format[NUM_LINES];
+
+	//(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
+	int deltaVal = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
+  
+  
+  text_layer_set_text_alignment (deltaLayer, GTextAlignmentCenter);
+  
+  //handle interval specific things, maybe changes alignenment of deltaLayer to right
+  if (tt_entries > 0) 
+    handleIntervalSettings(t,  done,  warnown);
+  //if delta we should show delta to exact time
+  handleDeltaToExact(delta,deltaVal);
+  
 	//(kr) hier wird übergeben, aber Text nicht gesetzt
 	int nextNLines = configureLayersForText(textLine, format);
 
@@ -446,11 +578,11 @@ static void display_actual_time(struct tm *t)
 // Time handler called every minute by the system
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
-  #if DEBUG==0 //switch off when using debug
+  //#if DEBUG==0 //switch off when using debug
 	actual_time = tick_time;
 	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
 	display_time(actual_time);	
-	#endif
+	//#endif
 }
 
 /**
@@ -458,18 +590,27 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
  * a standard app and you will be able to change the time with the up and down buttons
  */
 #if DEBUG
-
-static void up_single_click_handler(ClickRecognizerRef recognizer, void * context){ // Window *window) {
-	//(void)recognizer;
-	//(void)window; //hmm, it does not work with actual_time (was t in original)
+void initializeDebugTime()
+{	
 	if ( debug_time.tm_sec == 0 && debug_time.tm_min==0 && debug_time.tm_hour==0) //set time from actual_time
 	{
 		debug_time.tm_sec = actual_time->tm_sec ;
 		debug_time.tm_min = actual_time->tm_min ;
 		debug_time.tm_hour = actual_time->tm_hour ;
+
+     debug_time.tm_mday = actual_time->tm_mday;   /* day of the month (1 to 31) */
+     debug_time.tm_mon = actual_time->tm_mon;    /* months since January (0 to 11) */
+     debug_time.tm_year = actual_time->tm_year;   /* years since 1900 */
+     debug_time.tm_wday = actual_time->tm_wday;   /* days since Sunday (0 to 6 Sunday=0) */
+     debug_time.tm_yday = actual_time->tm_yday;   /* days since January 1 (0 to 365) */
 	}
+}
+static void up_single_click_handler(ClickRecognizerRef recognizer, void * context){ // Window *window) {
+	//(void)recognizer;
+	//(void)window; //hmm, it does not work with actual_time (was t in original)
+  initializeDebugTime();
 	debug_time.tm_sec=0;
-	debug_time.tm_min += 1;
+	debug_time.tm_min += 5;
 	if (debug_time.tm_min >= 60) {
 		debug_time.tm_min = 0;
 		debug_time.tm_hour += 1;
@@ -486,14 +627,9 @@ static void up_single_click_handler(ClickRecognizerRef recognizer, void * contex
 static void down_single_click_handler(ClickRecognizerRef recognizer, void * context) {//Window *window) {
 	//(void)recognizer;
 	//(void)window;
-	if ( debug_time.tm_sec == 0 && debug_time.tm_min==0 && debug_time.tm_hour==0) //set time from actual_time
-	{
-		debug_time.tm_sec = actual_time->tm_sec ;
-		debug_time.tm_min = actual_time->tm_min ;
-		debug_time.tm_hour = actual_time->tm_hour ;
-	}
+	initializeDebugTime();
 	debug_time.tm_sec = 0;
-	debug_time.tm_min -= 1;
+	debug_time.tm_min -= 5;
 	if (debug_time.tm_min < 0) {
 		debug_time.tm_min = 59;
 		debug_time.tm_hour -= 1;
@@ -506,6 +642,36 @@ static void down_single_click_handler(ClickRecognizerRef recognizer, void * cont
 	display_time(&debug_time);
 }
 
+static void up_long_click_handler(ClickRecognizerRef recognizer, void * context) 
+{
+	initializeDebugTime();
+	debug_time.tm_sec = 0;
+  debug_time.tm_hour ++;
+  if (debug_time.tm_hour >23 ) {
+			debug_time.tm_hour = 0;
+			debug_time.tm_wday = ( debug_time.tm_wday + 1) % 7;
+  }
+  APP_LOG(APP_LOG_LEVEL_DEBUG,"up long click with hour %i",debug_time.tm_hour);
+	display_time(&debug_time);
+
+}
+
+static void down_long_click_handler(ClickRecognizerRef recognizer, void * context) 
+{
+	initializeDebugTime();
+	debug_time.tm_sec = 0;
+  debug_time.tm_hour --;
+  if (debug_time.tm_hour < 0 ) {
+			debug_time.tm_hour = 23;
+			debug_time.tm_wday = ( debug_time.tm_wday - 1);
+			if (debug_time.tm_wday < 0 )
+			  debug_time.tm_wday = 6;
+  }
+  APP_LOG(APP_LOG_LEVEL_DEBUG,"down long click with hour %i",debug_time.tm_hour);
+	display_time(&debug_time);
+  
+}
+
 static void click_config_provider(void * config){ //ClickConfig **config, Window *window) {
   //(void)window; (kr) ClickConfig unknown, why (void)
 
@@ -516,76 +682,13 @@ static void click_config_provider(void * config){ //ClickConfig **config, Window
 
   //(kr) ClickHandler seems to be necessary
   window_single_click_subscribe(BUTTON_ID_UP, (ClickHandler) up_single_click_handler);
-  window_single_click_subscribe(BUTTON_ID_DOWN, (ClickHandler) down_single_click_handler);  
+  window_single_click_subscribe(BUTTON_ID_DOWN, (ClickHandler) down_single_click_handler);
+  window_long_click_subscribe(BUTTON_ID_UP, 0 , (ClickHandler) up_long_click_handler,0);
+  window_long_click_subscribe(BUTTON_ID_DOWN, 0 , (ClickHandler) down_long_click_handler,0);
+  //delay of 0 means 500 ms
 }
 
 #endif
-
-static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context)
-{
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d means %s", app_message_error, translate_error(app_message_error));
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error Dict_Error: %d", dict_error);
-}
-
-static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
-	GTextAlignment alignment;
-	APP_LOG(APP_LOG_LEVEL_DEBUG, "key is : %u", (uint) key);
-	switch (key) {
-		case TEXT_ALIGN_KEY:
-			text_align = new_tuple->value->uint8;
-			persist_write_int(TEXT_ALIGN_KEY, text_align);
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set text alignment: %i", text_align);
-
-			alignment = lookup_text_alignment(text_align);
-			for (int i = 0; i < NUM_LINES; i++)
-			{
-				text_layer_set_text_alignment(lines[i].currentLayer, alignment);
-				text_layer_set_text_alignment(lines[i].nextLayer, alignment);
-				layer_mark_dirty(text_layer_get_layer(lines[i].currentLayer));
-				layer_mark_dirty(text_layer_get_layer(lines[i].nextLayer));
-			}
-			break;
-		case INVERT_KEY:
-			invert = new_tuple->value->uint8 == 1;
-			persist_write_bool(INVERT_KEY, invert);
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set invert: %i", invert ? 1 : 0);
-
-			layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
-			layer_mark_dirty(inverter_layer_get_layer(inverter_layer));
-			break;
-		case LANGUAGE_KEY:
-			lang = (Language) new_tuple->value->uint8;
-			persist_write_int(LANGUAGE_KEY, lang);
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set language: %i", lang);
-			break;
-			//extensions for v 1.3
-		case DELTA_KEY:
-			delta = new_tuple->value->uint8 == 1;
-			persist_write_bool(DELTA_KEY, delta); //persistent
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set delta: %i", delta ? 1 : 0);
-			break;
-		case BATTERY_KEY:
-			battery = new_tuple->value->uint8 == 1;
-			persist_write_bool(BATTERY_KEY, battery); //persistent
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set battery: %i", battery ? 1 : 0);
-			break;
-		case WARNOWN_KEY:
-			warnown = new_tuple->value->uint8 == 1;
-			persist_write_bool(WARNOWN_KEY, warnown); //persistent
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set warnown: %i", warnown ? 1 : 0);
-			break;
-		case TIMETABLE_KEY:
-			timetable = new_tuple->value->uint8;
-			persist_write_bool(TIMETABLE_KEY, timetable); //persistent
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set timetable: %i", timetable );
-			break;
-			
-	}
-	if (actual_time)
-	{
-		display_time(actual_time);
-	}
-}
 
 static void init_line(Line* line)
 {
@@ -619,12 +722,13 @@ static void destroy_line(Line* line)
 	text_layer_destroy(line->nextLayer);
 }
 
-static TextLayer * prepareTextLayer (Layer * window_layer, char *layerText)
+static TextLayer * prepareTextLayer (Layer * window_layer, 
+     char *layerText, GTextAlignment alignment, int x, int y, int w , int h)
 {
-  TextLayer * layer=text_layer_create(GRect(0,0,144,28));
+  TextLayer * layer=text_layer_create(GRect(x,y,w,h)); 
 	text_layer_set_text(layer,layerText); 
   configureLayer(layer,FONT_KEY_GOTHIC_28  );
-  text_layer_set_text_alignment(layer,GTextAlignmentCenter);
+  text_layer_set_text_alignment(layer,alignment);
 	layer_set_hidden((Layer *) layer,false);
 	layer_add_child(window_layer, (Layer *)layer);
 	return layer;
@@ -639,7 +743,11 @@ static void batteryDisplayUpdate(Layer * layer, GContext * ctx)
 		BatteryChargeState charge_state = battery_state_service_peek();
 		int width = charge_state.charge_percent/100.0 * 144;
 		graphics_context_set_fill_color(ctx, GColorWhite);
-		graphics_fill_rect(ctx, GRect(0, 0, width, 2), 0, GCornerNone);
+		if (delta || done) //need some place for text
+  		graphics_fill_rect(ctx, GRect(0, 32, width, 2), 0, GCornerNone);
+    else
+      graphics_fill_rect(ctx, GRect(0, 5, width, 2), 0, GCornerNone);
+          
 		//think refers to layer bounds 
 		//APP_LOG(APP_LOG_LEVEL_INFO,"Done with width %i",width);		
 	}
@@ -672,11 +780,11 @@ static void window_load(Window *window)
 	text_layer_set_text(tempLayer,tempLayerText); //sonst hat er keinen speicher
 	layer_add_child(window_layer, (Layer *)tempLayer);
 
-  deltaLayer = prepareTextLayer (window_layer, deltaLayerText);
-  doneLayer = prepareTextLayer (window_layer, doneLayerText);  
+  deltaLayer = prepareTextLayer (window_layer, deltaLayerText, GTextAlignmentCenter, 0,0,144,28);//x,y,w,h
+  doneLayerL = prepareTextLayer (window_layer, doneLayerTextL,GTextAlignmentLeft, 0,0,144,28);  
+  doneLayerR = prepareTextLayer (window_layer, doneLayerTextR,GTextAlignmentRight,94,0,50,28);  
 
-  
-  batteryLayer = layer_create(GRect(0,35,144,2));
+  batteryLayer = layer_create(GRect(0,3,144,34)); //von 35 bis 36
   layer_set_update_proc(batteryLayer, batteryDisplayUpdate);
   layer_add_child(window_layer,batteryLayer);
   batteryDisplay();
@@ -690,26 +798,11 @@ static void window_load(Window *window)
 	time(&raw_time);
 	actual_time = localtime(&raw_time); //where is memory handled
 	display_actual_time(actual_time);	
-  APP_LOG(APP_LOG_LEVEL_INFO,"Buffer size is  %i",sizeof(sync_buffer));
-	Tuplet initial_values[] = {
-		TupletInteger(TEXT_ALIGN_KEY, (uint8_t) text_align),
-		TupletInteger(INVERT_KEY,     (uint8_t) invert ? 1 : 0),
-		TupletInteger(LANGUAGE_KEY,   (uint8_t) lang),
-		TupletInteger(DELTA_KEY,		  (uint8_t) delta ? 1 : 0),
-		TupletInteger(DONE_KEY,		  (uint8_t) done ? 1 : 0),
-		TupletInteger(BATTERY_KEY,		(uint8_t) battery ? 1 : 0),
-		TupletInteger(WARNOWN_KEY,		(uint8_t) warnown ? 1 : 0),
-		TupletInteger(TIMETABLE_KEY,		(uint8_t) timetable)
-	};
-  
-	app_sync_init(&sync, sync_buffer, sizeof(sync_buffer), initial_values, ARRAY_LENGTH(initial_values),
-			sync_tuple_changed_callback, sync_error_callback, NULL);
+
 }
 
 static void window_unload(Window *window)
 {
-	app_sync_deinit(&sync);
-
 	// Free layers
 	inverter_layer_destroy(inverter_layer);
   text_layer_destroy(tempLayer);
@@ -719,8 +812,319 @@ static void window_unload(Window *window)
 	}
 }
 
+/* hmm, strchr exists is not documented 
+static char * mystrchr (char * hs, char n)
+{
+  char * res = 0;
+  while (*hs)
+  {
+    if (*hs == n)
+    {
+      res = hs;
+      break;
+    }
+    hs++;
+  }
+  return res;
+}
+*/
+
+static int getTimeData(char * tupleString, int *sh, int *sm, int *eh, int *em, bool *own)
+{
+   char * tempBuf = (char *) malloc(strlen(tupleString)+1);
+   strcpy(tempBuf,tupleString); // copy is safer, don't know if I can modify tuple->value			    
+  // APP_LOG(APP_LOG_LEVEL_DEBUG,"part is  %s len is %i ", tempBuf , strlen(tupleString));
+   *sh=*sm=*eh=*em=0;
+   *own = false;
+   char * sep = strchr(tempBuf, '|'); //first |   18:30|20:20|1
+   int res = 1; //error
+   if (sep != 0)
+   {
+     //APP_LOG(APP_LOG_LEVEL_DEBUG,"part is  %s", sep+1);
+     
+     char * sep2 = strchr(sep+1, '|'); //second |        0     0
+     //APP_LOG(APP_LOG_LEVEL_DEBUG,"part is  %s", sep2);
+     *sep  = 0;
+     *sep2 = 0;
+     char * colon = strchr(tempBuf,':'); //first :    0     0  
+     char * colon2 = strchr(sep+1,':'); //second :
+     *colon = 0;
+     *colon2 = 0;
+     *sh = atoi(tempBuf);        // 18
+     *sm = atoi(colon+1);        //    30
+     *eh = atoi(sep+1);          //       20
+     *em = atoi(colon2+1);       //           20
+     *own   = (*(sep2+1) == '1') ;        //              1
+     //hmm should work  
+     //APP_LOG(APP_LOG_LEVEL_DEBUG,"stime  is %i:%i end  is %i:%i own is %i", *sh,*sm,*eh,*em,*own);  
+     //APP_LOG(APP_LOG_LEVEL_DEBUG,"string is %s parts %s %s %s %s", tupleString, sep+1, colon+1, sep2+1, colon2+1 );  
+     res = 0; //success
+   }
+   free (tempBuf);
+   return res;  
+}
+
+//die verkettete Liste freigeben
+static void freeTT()
+{
+  APP_LOG(APP_LOG_LEVEL_DEBUG,"Free List of TimeTable Entries");
+  for (int i = 0; i < 7; ++i)
+  {   
+    TTEntry *next = ttPerDay[i];
+    ttPerDay[i] = 0;
+    TTEntry *akt = next;
+    APP_LOG(APP_LOG_LEVEL_DEBUG,"Free day %i ",i);
+ 
+    while(akt)
+    {
+       next = akt->next;
+       free(akt); 
+       akt = next;
+    }
+  }
+}
+/*
+static void logTT()
+{
+  APP_LOG(APP_LOG_LEVEL_DEBUG," List of TimeTable Entries");
+  for (int i = 0; i < 7; ++i)
+  {   
+    TTEntry * akt = ttPerDay[i];
+    APP_LOG(APP_LOG_LEVEL_DEBUG,"We have day number %i with pointer %i",i,(int) akt);
+ 
+    while(akt)
+    {
+       APP_LOG(APP_LOG_LEVEL_DEBUG,"We have startMin %i endmin %i position %i  and next %i",akt->startMin, 
+         akt->endMin, akt->position, (int) akt->next);
+       akt = akt->next;
+    }
+  }
+}
+*/
+static void process_key_value(Tuple *tuple)
+{
+  uint32_t key =  tuple->key;
+
+	GTextAlignment alignment;
+	switch (key) {
+		case TEXT_ALIGN_KEY:
+			text_align = tuple->value->uint8;
+			persist_write_int(TEXT_ALIGN_KEY, text_align);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set text alignment: %i", text_align);
+
+			alignment = lookup_text_alignment(text_align);
+			for (int i = 0; i < NUM_LINES; i++)
+			{
+				text_layer_set_text_alignment(lines[i].currentLayer, alignment);
+				text_layer_set_text_alignment(lines[i].nextLayer, alignment);
+				layer_mark_dirty(text_layer_get_layer(lines[i].currentLayer));
+				layer_mark_dirty(text_layer_get_layer(lines[i].nextLayer));
+			}
+			break;
+		case INVERT_KEY:
+			invert = tuple->value->uint8 == 1;
+			persist_write_bool(INVERT_KEY, invert);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set invert: %i", invert ? 1 : 0);
+
+			layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
+			layer_mark_dirty(inverter_layer_get_layer(inverter_layer));
+			break;
+		case LANGUAGE_KEY:
+			lang = (Language) tuple->value->uint8;
+			persist_write_int(LANGUAGE_KEY, lang);
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set language: %i", lang);
+			break;
+			//extensions for v 1.3
+		case DELTA_KEY:
+			delta = tuple->value->uint8 == 1;
+			persist_write_bool(DELTA_KEY, delta); //persistent
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set delta: %i", delta ? 1 : 0);
+			break;
+		case BATTERY_KEY:
+			battery = tuple->value->uint8 == 1;
+			persist_write_bool(BATTERY_KEY, battery); //persistent
+			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set battery: %i", battery ? 1 : 0);
+			break;
+		case WARNOWN_KEY:
+			warnown = tuple->value->uint8 == 1;
+			persist_write_bool(WARNOWN_KEY, warnown); //persistent
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set warnown: %i", warnown ? 1 : 0);
+			break;
+		case DONE_KEY:
+		  done = tuple->value->uint8 == 1;
+			persist_write_bool(DONE_KEY, done); //persistent
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "set done: %i", done ? 1 : 0);
+			break;
+		case TIMETABLE_KEY:
+			tt_entries = tuple->value->uint32;
+			//persist_write_bool(TIMETABLE_KEY, tt_entries); //persistent
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set tt_entries: %i", tt_entries );
+			break;
+	  default:
+			APP_LOG(APP_LOG_LEVEL_DEBUG,"key is %i val is %s", (int) key,tuple->value->cstring);
+			// must be TTEntry , hmm should we write to persistent storage on watch?
+			//maybe later, otherwise it is not possible to use timetable without connection to 
+			//phone. if we had the connection the watch will get the data from the pebble app part of
+			//this program
+			// get var dayKeys = [1000,2000,3000,4000,5000,6000,7000]
+			if ((unsigned int)key >= 1000)
+			{
+        unsigned int dayIndex = (unsigned int) key / 1000 - 1;
+        unsigned int position = (unsigned int) key - key/1000 * 1000;  
+        int sh, sm, eh, em;
+        bool own;
+        if (! getTimeData((char *) tuple->value->cstring, &sh, &sm, &eh, &em, &own)) // returns 0 for success
+        {
+        //APP_LOG(APP_LOG_LEVEL_DEBUG,"sh %i sm %i eh %i em %i own %i ", sh, sm, eh,em, own );
+          TTEntry * tt = (TTEntry *) malloc(sizeof(TTEntry));
+          tt->startMin = sh*60 + sm;
+          tt->endMin = eh*60 +em;
+          tt->own = own;
+          tt->next = 0;
+          tt->position = position;   
+          TTEntry * aktTT = ttPerDay[dayIndex];
+          TTEntry * prev = 0; 
+          //int counter = 0;
+          while (  aktTT && aktTT->next && position > aktTT->position) //position suchen
+          {
+            prev = aktTT;
+            //APP_LOG(APP_LOG_LEVEL_DEBUG,"found number %i" , counter++);
+            aktTT = aktTT->next;
+            
+          }
+          //habe :0 -> erstes Element / aktTT->next == 0 -> muss als letztes Element gesetzt werde / einbauen
+          if (!aktTT || (!prev && position <= aktTT->position)  ) //erstes
+          {
+            ttPerDay[dayIndex] = tt;
+            tt->next = aktTT;			    
+          }
+          else if (!aktTT->next && position > aktTT->position) //letztes
+            aktTT->next = tt;
+          else //einbauen
+          { 
+            //APP_LOG(APP_LOG_LEVEL_DEBUG,"einbauen");
+            tt->next = aktTT;
+            prev->next = tt;
+          } //jetzt sollte eingehaengt sein 
+          
+          //mal ausgeben
+          /*
+          APP_LOG(APP_LOG_LEVEL_DEBUG,"Liste aus strukturen");
+          tt = ttPerDay[dayIndex];
+          while (tt)
+          {
+            APP_LOG(APP_LOG_LEVEL_DEBUG,"smin %i emin %i pos %i next is 0 pointer: %i ", 
+              tt->startMin, tt->endMin, tt->position, tt->next == 0 ? 1 :0 );
+            tt = tt->next;
+          }
+          */
+        }
+			}
+			else
+			{
+			  APP_LOG(APP_LOG_LEVEL_DEBUG,"problems with key %u", (unsigned int) key);
+			}
+	}
+	if (actual_time)
+	{
+		display_time(actual_time);
+	}
+}
+//event-handlers
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  //callback can only mean that we receive our settings
+  //logTT();
+  freeTT();
+  
+  // Get the first pair
+  Tuple *t = dict_read_first(iterator);
+
+  // Process all pairs present
+  while (t != NULL) {
+    // Long lived buffer
+    process_key_value(t);
+    // Process this pair's key
+    // Get next pair, if any
+    t = dict_read_next(iterator);
+  }
+	//have read all
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
+//switch to app_message instead of app_synch
+static void handle_message_init()
+{
+
+   //register event handler
+   app_message_register_inbox_received(inbox_received_callback);
+   app_message_register_inbox_dropped(inbox_dropped_callback);
+   app_message_register_outbox_failed(outbox_failed_callback);
+   app_message_register_outbox_sent(outbox_sent_callback);
+
+   // Initialize message queue
+  
+   APP_LOG(APP_LOG_LEVEL_INFO,"max outbox %u max inbox %u garantie outbox %u garantie inbox %u",
+	                    (uint) app_message_outbox_size_maximum(),
+	                    (uint) app_message_inbox_size_maximum(),
+	                    (uint) APP_MESSAGE_OUTBOX_SIZE_MINIMUM,
+	                    (uint) APP_MESSAGE_INBOX_SIZE_MINIMUM
+	                      );
+   APP_LOG(APP_LOG_LEVEL_INFO,"if app_message_open uses below garantie, it's sure that it will work, we use max values");                      
+  
+   app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+                                       
+}
+//tap should switch weekend mode
+static void tap_handler(AccelAxisType axis, int32_t direction) {
+  static bool first = true;
+  if (tt_entries > 0)
+  {
+    if (first)
+    {
+      if (done || warnown) //one is set - unset them all
+        done = warnown = false;
+      else 
+        done = warnown = true; 
+    }
+    else //change status
+    {
+      done = !done;
+      warnown = ! warnown;
+    }
+    first = ! first;
+    if (actual_time)
+      display_time(actual_time);
+  } 
+}
+
+        
 static void handle_init() {
 	// Load settings from persistent storage
+  /*remember 
+    #define TIMETABLE_KEY 0 //how many entries in timetable
+    #define TEXT_ALIGN_KEY 1
+    #define LANGUAGE_KEY 2
+    #define DELTA_KEY 3   
+    #define DONE_KEY 4  //show minutes done   
+    #define BATTERY_KEY 5 // battery bar 
+    #define WARNOWN_KEY 6 // warning / vibration 5 minutes before own lessen 
+    #define INVERT_KEY 10 
+  */
+	if (persist_exists(TIMETABLE_KEY))
+	{ //later, haven't the timetable in persistant storage
+		//tt_entries = persist_read_int(TIMETABLE_KEY);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read number of TTEntries from store: %i", tt_entries);
+	}
 	if (persist_exists(TEXT_ALIGN_KEY))
 	{
 		text_align = persist_read_int(TEXT_ALIGN_KEY);
@@ -741,6 +1145,21 @@ static void handle_init() {
 		delta =  persist_read_bool(DELTA_KEY);
 		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read delta from store: %i", delta ? 1 : 0);
 	}
+	if (persist_exists(DONE_KEY))
+	{
+		done =  persist_read_bool(DONE_KEY);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read done from store: %i", done ? 1 : 0);
+	}
+	if (persist_exists(BATTERY_KEY))
+	{
+		battery =  persist_read_bool(BATTERY_KEY);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read battery from store: %i", battery ? 1 : 0);
+	}
+	if (persist_exists(WARNOWN_KEY))
+	{
+		warnown =  persist_read_bool(WARNOWN_KEY);
+		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read warnown from store: %i", warnown ? 1 : 0);
+	}
 	
 
 	window = window_create();
@@ -750,21 +1169,11 @@ static void handle_init() {
 		.unload = window_unload
 	});
   window_set_fullscreen(window, true); 
-	
-	// Initialize message queue
-	const int inbound_size = sizeof(sync_buffer);
-	const int outbound_size = sizeof(sync_buffer);//64;
-  //buffer-size problem need some time to localize it 
-  
-	APP_LOG(APP_LOG_LEVEL_INFO,"max outbox %u max inbox %u garantie outbox %u garantie inbox %u",
-	                    (uint) app_message_outbox_size_maximum(),
-	                    (uint) app_message_inbox_size_maximum(),
-	                    (uint) APP_MESSAGE_OUTBOX_SIZE_MINIMUM,
-	                    (uint) APP_MESSAGE_INBOX_SIZE_MINIMUM
-	                      );
-	APP_LOG(APP_LOG_LEVEL_INFO,"if app_message_open uses below garantie, it's sure that it will work, we use %u",
-	        (uint) outbound_size);                      
-	app_message_open(inbound_size, outbound_size);
+
+  //subscribe tap_handler
+  accel_tap_service_subscribe(tap_handler);
+  //message gedoens
+  handle_message_init();	
 
 	const bool animated = true;
 	window_stack_push(window, animated);
@@ -780,6 +1189,7 @@ static void handle_init() {
 
 static void handle_deinit()
 {
+  freeTT();
 	// Free window
 	window_destroy(window);
 }

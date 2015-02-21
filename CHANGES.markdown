@@ -21,20 +21,47 @@ Start version of "my app". Based heavily on the original work. I needed an
 example to look how it works and after that I have some ideas to fit the 
 app to my needs. So it becomes an extended version called Student and Teachers
 version. 
- - fixed bug in num2words.h (done)
- - appinfo.json version is not ok (only two numbers not three)
- - Text in German is adapted ein / eins and fuenf vor halb instead of 25 nach
-   changed German REL text from *$1 Uhr to es ist *$1
-   advantage: line three is small in German Display - use this part for Delta
-   (see additions)
- - changed positioning of rows 
- - fixed debugging option, remember to use different appinfo.json 
-   use debug_time to avoid conflicts with the "normal time" (done)
- - in german zwanzig is not shown correct because it's to wide
-   don't understand that because the size of zwanzig is 142 and 144
-	 should be possible - nevertheless, if text is to wide I reduce font
-	 of all lines which are not bold
 
+Modifications
+
+- fixed bug in num2words.h (done)
+- appinfo.json version is not ok (only two numbers not three), done, added version
+  for debugging appinfo.json.watchapp (copy)
+- Text in German is adapted ein / eins and fuenf vor halb instead of 25 nach
+  changed German REL text from *$1 Uhr to es ist *$1
+- changed positioning of rows slightly 
+- fixed debugging option, remember to use different appinfo.json 
+  use debug_time to avoid conflicts with the "normal time" (done)
+- fixed problem of "cut off" zwanzig in german and maybe other languages
+  by switching to smaller font if line is wider than 140 px
+- rewritten configure-fuzzy-text.html to use jquery mobile and allow to configure timetable
+  and new options 
+- changed url-location
+
+
+Additions (configurable)
+
+- Bluetooth state (todo / think I will not do / need it)
+- Battery state can be shown as thin line which visualize the percent of battery state
+  (full line - 100 %) 
+- Show delta minutes to exact time as number  (exact - fuzzy ).
+  Number is positioned in the middle of the top line or at the right 
+  * means no difference between exact and fuzzy  
+- TimeTable. It's possible to define a table per day which represents the lessons.
+  Eg: I have to hold a lesson on Monday from 9:45 to 11:15 am -> can put it into the timetable
+  and you can mark it at your own lesson (see warnown)
+
+  ATTENTION: I haven't put  the timetable into the persistant storage, so if you start the watchface
+  and your mobile is not connected there will be now entries in the timetable (I think I will fix it)
+
+ - Option done: 
+   If option done is set the watch will display how much time is done in the lesson (left upper corner)
+   and how much time is left in the lesson upper right corner. 
+   If your are not in a lessen, in the left upper corner is displayed when the next lesson begins
+ - Option warnown: 5 minutes before next own lesson starts, the watch will vibrate. 
+
+ - Weekend mode: tap_event is handled, so if you move the watch fast the done and warnown options will be
+	 turned off or on 
 
 version 1.2.1
 -------------

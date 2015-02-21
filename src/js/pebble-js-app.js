@@ -34,8 +34,9 @@ function readyCallback(event) {
 function showConfiguration(event) {
   onReady(function() {
     var opts = getOptions();
-    var url  = "http://192.168.2.54/roemke/pebble/fuzzy/configure-fuzzy-text.html";
+    var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
     Pebble.openURL(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
+    console.log(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
   });
 }
 
@@ -47,8 +48,7 @@ function webviewclosed(event) {
     "timeTable":{"Tue":[{"start":"10:51","end":"11:51","own":false}],"Wed":[{"start":"10:51","end":"11:51","own":true}]}}
     now changed because c-app can only work with pairs of key value, so i used the above keys for the days : -) 
     now it looks like:
-    response: {"2000":"11:44","2001":"12:44","2002":1,"2003":"13:44","2004":"14:44","2005":0,"4000":"13:44","4001":"14:44","4002":0,"4003":"14:44","4004":"15:44","4005":1,"invert":false,"text_align":"right","lang":"de","delta":false,"battery":true} (string)
-
+    response: {"2000":"11:44|12:44|1","2001":"13:44|14:44|0","4000":"13:44|14:44:0","invert":false,"text_align":"right","lang":"de","delta":false,"battery":true} (string)    
    */
  
   var options = JSON.parse(resp);
@@ -87,7 +87,7 @@ function setOptions(options) {
 function prepareConfiguration(serialized_settings) {
   var settings = JSON.parse(serialized_settings);
   var result =  {
-    "0": settings.invert ? 1 : 0,
+    "10": settings.invert ? 1 : 0,
     "1": alignments[settings.text_align],
     "2": langs[settings.lang],
     "3": settings.delta ? 1 : 0,
@@ -103,9 +103,10 @@ function prepareConfiguration(serialized_settings) {
   		if (prop >>> 0 === parseFloat(prop)) //prop is integer
   		{
   			dataCounter++;
+  			result[prop]= settings[prop]; //transfer it to result 
   		}
   }
-  result["10"] = dataCounter/3; //send back how many entries I have in the timetable 
+  result["0"] = dataCounter; //send back how many entries I have in the timetable 
   //time table has indices like defined in dayKeys see above
   return result;
 }

@@ -67,7 +67,8 @@
 			lang:		params.lang,
 			delta:  params.delta === 'on',
 			battery: params.battery === 'on',
-			warnown: params.warnon === 'on'
+			done: params.done === 'on',
+			warnown: params.warnown === 'on'
 		};
 		//now read the table data
 		/*
@@ -89,11 +90,11 @@
 				}
 			}	
 		
-		console.log(options); //ok, is nice and can be serialized, but this form has to be converted
+		//console.log(options); //ok, is nice and can be serialized, but this form has to be converted
 		//on pebble-js-app to  send via bluetooth, 
 		//so I would say I start on 1000 for Monday, 2000 for thursday and so on to have a key for the
 		//dates no, I cant't do it with AppSync, nevertheless I transfer it here and in pebble-js-app 
-		//I can count the entries and store them
+		//but I think it will work with AppMessage in one call, 2k schould be enough
 		*/
 		for (var i = 0; i < days.length; ++i)
 		{
@@ -104,17 +105,39 @@
 				for (var j= 1; j < tableRows.length; ++j)
 				{
 					var tds = $(tableRows[j]).find('td');
-					options[start + 3*(j - 1)    ] = $(tds[0]).html();
-					options[start + 3*(j - 1) +1 ] = $(tds[1]).html();
-					options[start + 3*(j - 1) +2 ] = $(tds[2]).find('input').prop('checked') ? 1 : 0;
+					options[start + j-1   ] = $(tds[0]).html()
+					 + "|" +  $(tds[1]).html() + "|" + ( $(tds[2]).find('input').prop('checked') ? 1 : 0 ); 
 				}  
 			}
 		}			
 		return options;
 	}
 
+  function handleTimeTableSettings()
+  {
+    var opts = getObject.options;
+  	if (opts)
+  	{
+  	   for(var prop in opts)
+  	   {
+  	   	  //$('#out').append('<br>prop: '+  prop  + " is " + opts[prop] );
+  	   	  var index = parseFloat(prop)
+  	   		if (prop >>> 0 === index && index>=1000) //prop is integer
+  				{
+  					var dow = parseInt(index/1000) - 1;
+  					var entries = opts[prop].split('|');
+  					//insert into table 
+  					var checked =  (entries[2] == 1) ? true : false;
+  					
+  					insertRowSorted(entries[0], entries[1], checked,days[dow])  
+  				}
+ 
+  	   }	
+  	}
+  }
 //first called
 	function applyOptions() {
+	//all but timetableSettings
 		var $form	= $('#config');
 		var opts	= getObject.options;
 		//$('#out').append(JSON.stringify(opts));
@@ -141,6 +164,9 @@
 		}
 		if (opts && opts.battery) {
 			$form.find('[name="battery"]').prop('checked', true).checkboxradio('refresh');
+		}
+		if (opts && opts.done) {
+			$form.find('[name="done"]').prop('checked', true).checkboxradio('refresh');
 		}
 		if (opts && opts.warnown) {
 			$form.find('[name="warnown"]').prop('checked', true).checkboxradio('refresh');
@@ -198,6 +224,11 @@ $(document).on('pagecreate','#optionPage', function() {
 	//$('#out').append("<br> v=" + getObject.v);
 	//ok, works
 	applyOptions();
+	
+	//ttpage timetablepage vorbereiten
+	prepareTTPage();
+	handleTimeTableSettings();
+	//----------------------------
 	$(document).on("vclick",".b-submit",function() {
 		var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(saveOptions()));
 		//console.log(location);
@@ -235,7 +266,7 @@ $(document).on('pagecreate','#optionPage', function() {
 				<a href="CHANGES.html">See changes</a>
 			</div>
 
-			<div id='out' class='bg-info hidden'></div>
+			<div id='out' class='bg-info '></div>
 
 			<form id="config">
 				<fieldset data-role="controlgroup">
@@ -254,7 +285,7 @@ $(document).on('pagecreate','#optionPage', function() {
 				</fieldset>
 				<div data-role="controlgroup">
 						<label>
-							<input type="checkbox" name="showtime" value="on" />
+							<input type="checkbox" name="done" value="on" />
 							Show minutes which have passed and remaining minutes
 							according to the defined intervals / lessons. </label>
 						<label>
@@ -332,56 +363,118 @@ $(document).on('pagecreate','#optionPage', function() {
 	</div>
 	<!-- page ende -->
 	<script>
-		$(document).on('pagebeforecreate', '#ttPage', function() {
+	  function insertRowSorted(stime, endTime, checked,day)
+	  {
+			if (checked)
+				checked = 'checked';
+			var table = '#tt' + day;            	
+			var dtStime = new Date(2015,01,01,stime.split(':')[0],stime.split(':')[1] );
+			var inserted = false; 
+			var insertionString = "<tr class='time-data' ><td>"  +stime +  "</td>" + 
+						"<td>" + endTime + "</td>" + "<td>" + 
+						 //'<div class="checkbox"><input type="checkbox" value="on" ' + checked + ' ></div> </td>' + //checkbox if own
+						 '<input type="checkbox" value="on" data-role="none"' + checked + ' ></td>' + //checkbox if own
+						 "<td><button id='bMinus" + day + 
+						 "' class='ui-btn ui-icon-minus ui-btn-icon-notext  ui-btn-inline '> </button></td></tr>"
+			
+				var trs = $(table +' tr.time-data');                   
+				trs.each(function()
+				{
+					//console.log($(this).html());
+					var aktStime = $(this).find('td').first().html();
+					var dtAktStime = new Date(2015,01,01,aktStime.split(':')[0],aktStime.split(':')[1] );
+					//console.log("dtStime " + dtStime);
+					//console.log("dtAktStime " + dtAktStime);
+					if (dtStime < dtAktStime) //insertion sort, dAktStime is greater then dtStime 
+					{ //if each traverse from left to right, I should have the position
+						inserted = true;
+						$(this).before(insertionString);
+						return false; //stops each loop? - it should
+					}						
+				});
+			if (!inserted)
+			{  //then at the end of the rows, first call - behind th row
+				$(table +' tr').last().after(insertionString); 
+			}
+	  }
+	  
+	  //before create - for modifications on the content of the page
+	  //so content should be there 
+		//$(document).on('pagecreate', '#ttPage', function() {
+    //  handleTimeTableSettings(); 
+    //  });
+      
+    //muss schon beim laden der option-seite passieren 
+    //optionseite ist immer die erste  
+		// $(document).on('pagebeforecreate', '#ttPage', function() {
+		function prepareTTPage()
+		{
 			var i = 0;
 			$('#ttContent fieldset.day').each(function()//append tables
 			{
 				$(this).append("<table class='fullwidth' id='tt" + days[i] + "'>" + 
 				"	<tr><th>Start</th><th>End</th><th>Own</th>" + 
-				"   <th><button id='bPlus" + days[i++] + 
+				"   <th><button id='bPlus" + days[i] + 
 				" 'class='ui-btn ui-icon-plus ui-btn-icon-notext  ui-btn-inline '> </button></th>" + 
 				"   <th>   </th></tr>" + "</table>");
+				$(this).append("<button class='ctransfer' id='"+ days[i++] +
+					"'>transfer Table</buttons>");  
 			});
+			//have all tables for the days -> append data we get in getstring
+      
+      
+      $('#popUpTransferOk').on('vclick', function(){
+      	//append data of one day to all other days
+					var thisTable = '#tt'+$(this).data('day');
+					var thisRows = $(thisTable +' tr.time-data');
+					$('#transferDays input:checked').each(function()
+					{
+						//console.log("append to : " + $(this).val());
+						var day =  $(this).val();
+						//$('#tt'+day).append(thisRows); so scheint verschoben zu werden
+						$('#tt'+day).append(thisRows.clone());
+					});
+      });
+      $('#ttContent').on('vclick', 'button.ctransfer', function() {
+         var day = $(this).attr('id');
+         var count = $('#tt'+day +' tr.time-data').length;
+         if (count > 0)
+         { 
+					 $('#transferDays').empty(); //leer
+					 for (i = 0; i < 7 ; ++i)
+					 {
+							if ( day != days [i])
+							{
+								$('#transferDays').append('<label>'+days[i] +
+									'<input value="'+ days[i] +' " type="checkbox"> </label>');
+							}
+					 }
+					 $('#transferDays input').checkboxradio();
+					 $('#transferDialog').popup(
+					 		{
+					 			afteropen: function(event,ui)
+					 			{
+					 				$('#popUpTransferOk').data('day',day);
+					 			}
+					 		}).popup('open');
+         }      	
+      });
+           
+      
 			//event handler to every table - only seven eventhandlers are created
 			//see delegate events in jquery
 			$('#ttContent fieldset.day table').on('click', 'button.ui-icon-plus', function() {
 				var id = $(this).attr('id');
 				var day = id.substring(5);
 				var table = '#tt' + day;
-				var parent = $(this).parents('tr');
+				//var parent = $(this).parents('tr');
 				$('#popUpOk').off();
 				$('#popUpOk').on('vclick', function() {
 					//console.log("popup closed with ok");
-					var checked = $('#ownLesson').prop('checked') ? 'checked' : '';
+					var checked = $('#ownLesson').prop('checked');
 					var stime = $('#startTime').val() ;
-					var dtStime = new Date(2015,01,01,stime.split(':')[0],stime.split(':')[1] );
-					var inserted = false; //insert time so that the table stay sorted
-					var insertionString = "<tr class='time-data' ><td>"  +stime +  "</td>" + 
-								"<td>" + $('#endTime').val() + "</td>" + "<td>" + 
-								 '<div class="checkbox"><input type="checkbox" value="on" ' + checked + ' ></div> </td>' + //checkbox if own
-								 "<td><button id='bMinus" + day + 
-								 "' class='ui-btn ui-icon-minus ui-btn-icon-notext  ui-btn-inline '> </button></td></tr>"
-					
-					var trs = $(table +' tr.time-data');                   
-				    trs.each(function()
-				    {
-				    	
-						//console.log($(this).html());
-						var aktStime = $(this).find('td').first().html();
-						var dtAktStime = new Date(2015,01,01,aktStime.split(':')[0],aktStime.split(':')[1] );
-						//console.log("dtStime " + dtStime);
-						//console.log("dtAktStime " + dtAktStime);
-						if (dtStime < dtAktStime) //insertion sort, dAktStime is greater then dtStime 
-						{ //if each traverse from left to right, I should have the position
-							inserted = true;
-							$(this).before(insertionString);
-							return false; //stops each loop? - it should
-						}						
-					});
-					if (!inserted)
-					{  //then at the end of the rows, first call - behind th row
-						$(table +' tr').last().after(insertionString); 
-					}
+					var endTime = $('#endTime').val();
+					insertRowSorted(stime, endTime, checked,day);
 				});
 				$('#timeDialog').popup('open');
 
@@ -394,7 +487,7 @@ $(document).on('pagecreate','#optionPage', function() {
 				var parent = $(this).parents('tr');
 				parent.remove();
 			});
-		});
+		}//);
 	</script>
 	<div data-role="page" id='ttPage'>
 		<!-- page for time table -->
@@ -454,8 +547,7 @@ $(document).on('pagecreate','#optionPage', function() {
 						<a data-role="button"   class="b-submit">Save</a>
 					</li>
 				</ul>
-			</div>
-			<!-- navbar -->
+			</div><!-- navbar -->
 		</div><!-- /footer -->
 		<!-- pop up needs to be in same page, here it is now problem, need dialog only on this page -->
 		<div data-role='popup' id='timeDialog' data-dismissible='false'>
@@ -475,16 +567,26 @@ $(document).on('pagecreate','#optionPage', function() {
 						<label>Own
 							<input id='ownLesson' type="checkbox">
 						</label>
-					</div>
+					</div> <!-- eo fieldcontain -->
 				</form>
 				<a href="#" class="ui-btn ui-corner-all ui-shadow ui-btn-inline ui-btn-b" data-rel="back">Cancel</a>
 				<a href="#" id='popUpOk' class="ui-btn ui-corner-all ui-shadow ui-btn-inline ui-btn-b" data-rel="back" data-transition="flow">Ok</a>
+			</div> <!-- end of role main -->
+		</div><!-- end of popup -->	
+		<div data-role='popup' id='transferDialog' data-dismissible='false'>
+			<div data-role="header" data-theme="a">
+				<h1>Transfer this entries to </h1>
 			</div>
-		</div>
-	</div>
-	<!-- end of ttPage -->
-
-	</div>
+			<div role="main" class="ui-content">
+				<form>
+					<div id="transferDays" data-role="fieldcontain">
+					</div> <!-- eo fieldcontain -->
+				</form>
+				<a href="#" class="ui-btn ui-corner-all ui-shadow ui-btn-inline ui-btn-b" data-rel="back">Cancel</a>
+				<a href="#" id='popUpTransferOk' class="ui-btn ui-corner-all ui-shadow ui-btn-inline ui-btn-b" data-rel="back" data-transition="flow">Ok</a>
+			</div> <!-- end of role main -->
+		</div><!-- end of popup -->	
+	</div><!-- end of ttPage -->
 	<!-- End Document
 	================================================== -->
 

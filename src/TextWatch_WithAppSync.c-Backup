@@ -85,7 +85,6 @@ static char doneLayerText[]="           ";
 
 static Layer * batteryLayer;
 
-static char tt_data[24]=""; 
 //static time was *t ,  rename it
 static struct tm *actual_time; //renamed from t in the original source
 #if DEBUG
@@ -395,6 +394,7 @@ static void display_time(struct tm *t)
 		layer_set_hidden((Layer *) deltaLayer,true);
 		//layer_mark_dirty((Layer *) deltaLayer);
 	}	
+  layer_mark_dirty((Layer *) deltaLayer); //sicher gehen
 	//(kr) hier wird übergeben, aber Text nicht gesetzt
 	int nextNLines = configureLayersForText(textLine, format);
 
@@ -446,11 +446,11 @@ static void display_actual_time(struct tm *t)
 // Time handler called every minute by the system
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
-  #if DEBUG==0 //switch off when using debug
+  //#if DEBUG==0 //switch off when using debug
 	actual_time = tick_time;
 	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
 	display_time(actual_time);	
-	#endif
+	//#endif
 }
 
 /**

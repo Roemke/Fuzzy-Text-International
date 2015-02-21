@@ -14,6 +14,7 @@ Versuche das Teil erstmal zum laufen zu bringen
 --------
 entwickler verbindung auf pebble app eingestellt
 ip setzen pebble install --phone 192.168.2.48
+oder export PEBBLE_PHONE=192.168.2.48
 habe bei der installation was uebersehen:
     cd ~/pebble-dev/PebbleSDK-2.8.1
     virtualenv --no-site-packages .env
@@ -161,3 +162,22 @@ AppSync wechseln muss auf AppMessage - kommunikation ist flexibler
 vorher mal eine kopie einer halbwegs funktionierenden kommunikation machen
 - geschehen, prinzipiell laeuft das watchface, nicht natuerlich die 
 timetable geschichte
+
+ok, kopie erstellt ohne app-synch, läuft ebenfalls problemlos
+nehme jetzt die timetable wieder dazu, versuche als ganzes zu senden,
+da von javascript aus ca. 2kB auf einen Rutsch gesendet werden können.
+Alternative: 
+http://forums.getpebble.com/discussion/11403/how-do-send-many-app-messages-in-a-loop-to-the-watch
+nicht noetig klappt, speichere als linked list
+
+ein paar verbesserungen, scheint jetzt zu laufen
+
+2015-02-21
+timetable so weit ok ohne persistenz 
+Fehlerkorrekturen, weekend modus mit Hand schuetteln
+optionen done und warnown umgesetzt
+
+schiebe mal in's git und dann auch auf github
+git add -A
+git commit
+git push origin master
