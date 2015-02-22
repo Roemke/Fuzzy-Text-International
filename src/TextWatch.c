@@ -26,7 +26,6 @@
 #define BATTERY_KEY 5 // battery bar 
 #define WARNOWN_KEY 6 // warning / vibration 5 minutes before own lessen 
 #define INVERT_KEY 10 
-
 //-----------------
 
 #define TEXT_ALIGN_CENTER 0
@@ -884,10 +883,10 @@ static void freeTT()
     }
   }
 }
-/*
-static void logTT()
+
+static void logTT(const char * fromWhere)
 {
-  APP_LOG(APP_LOG_LEVEL_DEBUG," List of TimeTable Entries");
+  APP_LOG(APP_LOG_LEVEL_DEBUG," List of TimeTable Entries we are called from %s",fromWhere);
   for (int i = 0; i < 7; ++i)
   {   
     TTEntry * akt = ttPerDay[i];
@@ -901,7 +900,45 @@ static void logTT()
     }
   }
 }
-*/
+
+//put data to list 
+void put_to_list(int key, int sh, int sm, int eh, int em, bool own)
+{
+  unsigned int dayIndex = (unsigned int) key / 1000 - 1;
+  unsigned int position = (unsigned int) key - key/1000 * 1000;  
+  
+  TTEntry * tt = (TTEntry *) malloc(sizeof(TTEntry));
+  tt->startMin = sh*60 + sm;
+  tt->endMin = eh*60 +em;
+  tt->own = own;
+  tt->next = 0;
+  tt->position = position;   
+  TTEntry * aktTT = ttPerDay[dayIndex];
+  TTEntry * prev = 0; 
+  //int counter = 0;
+  while (  aktTT && aktTT->next && position > aktTT->position) //position suchen
+  {
+    prev = aktTT;
+    //APP_LOG(APP_LOG_LEVEL_DEBUG,"found number %i" , counter++);
+    aktTT = aktTT->next;
+    
+  }
+  //habe :0 -> erstes Element / aktTT->next == 0 -> muss als letztes Element gesetzt werde / einbauen
+  if (!aktTT || (!prev && position <= aktTT->position)  ) //erstes
+  {
+    ttPerDay[dayIndex] = tt;
+    tt->next = aktTT;			    
+  }
+  else if (!aktTT->next && position > aktTT->position) //letztes
+    aktTT->next = tt;
+  else //einbauen
+  { 
+    //APP_LOG(APP_LOG_LEVEL_DEBUG,"einbauen");
+    tt->next = aktTT;
+    prev->next = tt;
+  } //jetzt sollte eingehaengt sein 
+}          
+
 static void process_key_value(Tuple *tuple)
 {
   uint32_t key =  tuple->key;
@@ -911,7 +948,6 @@ static void process_key_value(Tuple *tuple)
 		case TEXT_ALIGN_KEY:
 			text_align = tuple->value->uint8;
 			persist_write_int(TEXT_ALIGN_KEY, text_align);
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set text alignment: %i", text_align);
 
 			alignment = lookup_text_alignment(text_align);
 			for (int i = 0; i < NUM_LINES; i++)
@@ -925,7 +961,6 @@ static void process_key_value(Tuple *tuple)
 		case INVERT_KEY:
 			invert = tuple->value->uint8 == 1;
 			persist_write_bool(INVERT_KEY, invert);
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set invert: %i", invert ? 1 : 0);
 
 			layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
 			layer_mark_dirty(inverter_layer_get_layer(inverter_layer));
@@ -933,36 +968,31 @@ static void process_key_value(Tuple *tuple)
 		case LANGUAGE_KEY:
 			lang = (Language) tuple->value->uint8;
 			persist_write_int(LANGUAGE_KEY, lang);
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set language: %i", lang);
 			break;
 			//extensions for v 1.3
 		case DELTA_KEY:
 			delta = tuple->value->uint8 == 1;
 			persist_write_bool(DELTA_KEY, delta); //persistent
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set delta: %i", delta ? 1 : 0);
 			break;
 		case BATTERY_KEY:
 			battery = tuple->value->uint8 == 1;
 			persist_write_bool(BATTERY_KEY, battery); //persistent
-			//APP_LOG(APP_LOG_LEVEL_DEBUG, "Set battery: %i", battery ? 1 : 0);
 			break;
 		case WARNOWN_KEY:
 			warnown = tuple->value->uint8 == 1;
 			persist_write_bool(WARNOWN_KEY, warnown); //persistent
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set warnown: %i", warnown ? 1 : 0);
 			break;
 		case DONE_KEY:
 		  done = tuple->value->uint8 == 1;
 			persist_write_bool(DONE_KEY, done); //persistent
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "set done: %i", done ? 1 : 0);
 			break;
 		case TIMETABLE_KEY:
+		  
 			tt_entries = tuple->value->uint32;
-			//persist_write_bool(TIMETABLE_KEY, tt_entries); //persistent
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set tt_entries: %i", tt_entries );
+			persist_write_int(TIMETABLE_KEY, tt_entries); //persistent
 			break;
 	  default:
-			APP_LOG(APP_LOG_LEVEL_DEBUG,"key is %i val is %s", (int) key,tuple->value->cstring);
+	    //store raw c-string 
 			// must be TTEntry , hmm should we write to persistent storage on watch?
 			//maybe later, otherwise it is not possible to use timetable without connection to 
 			//phone. if we had the connection the watch will get the data from the pebble app part of
@@ -970,55 +1000,13 @@ static void process_key_value(Tuple *tuple)
 			// get var dayKeys = [1000,2000,3000,4000,5000,6000,7000]
 			if ((unsigned int)key >= 1000)
 			{
-        unsigned int dayIndex = (unsigned int) key / 1000 - 1;
-        unsigned int position = (unsigned int) key - key/1000 * 1000;  
+			  persist_write_string((int)key,tuple->value->cstring);
         int sh, sm, eh, em;
         bool own;
         if (! getTimeData((char *) tuple->value->cstring, &sh, &sm, &eh, &em, &own)) // returns 0 for success
         {
         //APP_LOG(APP_LOG_LEVEL_DEBUG,"sh %i sm %i eh %i em %i own %i ", sh, sm, eh,em, own );
-          TTEntry * tt = (TTEntry *) malloc(sizeof(TTEntry));
-          tt->startMin = sh*60 + sm;
-          tt->endMin = eh*60 +em;
-          tt->own = own;
-          tt->next = 0;
-          tt->position = position;   
-          TTEntry * aktTT = ttPerDay[dayIndex];
-          TTEntry * prev = 0; 
-          //int counter = 0;
-          while (  aktTT && aktTT->next && position > aktTT->position) //position suchen
-          {
-            prev = aktTT;
-            //APP_LOG(APP_LOG_LEVEL_DEBUG,"found number %i" , counter++);
-            aktTT = aktTT->next;
-            
-          }
-          //habe :0 -> erstes Element / aktTT->next == 0 -> muss als letztes Element gesetzt werde / einbauen
-          if (!aktTT || (!prev && position <= aktTT->position)  ) //erstes
-          {
-            ttPerDay[dayIndex] = tt;
-            tt->next = aktTT;			    
-          }
-          else if (!aktTT->next && position > aktTT->position) //letztes
-            aktTT->next = tt;
-          else //einbauen
-          { 
-            //APP_LOG(APP_LOG_LEVEL_DEBUG,"einbauen");
-            tt->next = aktTT;
-            prev->next = tt;
-          } //jetzt sollte eingehaengt sein 
-          
-          //mal ausgeben
-          /*
-          APP_LOG(APP_LOG_LEVEL_DEBUG,"Liste aus strukturen");
-          tt = ttPerDay[dayIndex];
-          while (tt)
-          {
-            APP_LOG(APP_LOG_LEVEL_DEBUG,"smin %i emin %i pos %i next is 0 pointer: %i ", 
-              tt->startMin, tt->endMin, tt->position, tt->next == 0 ? 1 :0 );
-            tt = tt->next;
-          }
-          */
+          put_to_list(key, sh, sm, eh, em, own);
         }
 			}
 			else
@@ -1034,7 +1022,7 @@ static void process_key_value(Tuple *tuple)
 //event-handlers
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
   //callback can only mean that we receive our settings
-  //logTT();
+  //logTT("inbox_received_callback");
   freeTT();
   
   // Get the first pair
@@ -1049,6 +1037,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     t = dict_read_next(iterator);
   }
 	//have read all
+	//logTT("inbox_received - done");
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
@@ -1067,11 +1056,12 @@ static void handle_message_init()
 {
 
    //register event handler
+   
    app_message_register_inbox_received(inbox_received_callback);
    app_message_register_inbox_dropped(inbox_dropped_callback);
    app_message_register_outbox_failed(outbox_failed_callback);
    app_message_register_outbox_sent(outbox_sent_callback);
-
+   
    // Initialize message queue
   
    APP_LOG(APP_LOG_LEVEL_INFO,"max outbox %u max inbox %u garantie outbox %u garantie inbox %u",
@@ -1127,46 +1117,64 @@ static void handle_init() {
     #define INVERT_KEY 10 
   */
 	if (persist_exists(TIMETABLE_KEY))
-	{ //later, haven't the timetable in persistant storage
-		//tt_entries = persist_read_int(TIMETABLE_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read number of TTEntries from store: %i", tt_entries);
+	{ 
+    tt_entries = persist_read_int(TIMETABLE_KEY);
 	}
 	if (persist_exists(TEXT_ALIGN_KEY))
 	{
 		text_align = persist_read_int(TEXT_ALIGN_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read text alignment from store: %i", text_align);
 	}
 	if (persist_exists(INVERT_KEY))
 	{
 		invert = persist_read_bool(INVERT_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read invert from store: %i", invert ? 1 : 0);
 	}
 	if (persist_exists(LANGUAGE_KEY))
 	{
 		lang = (Language) persist_read_int(LANGUAGE_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read language from store: %i", lang);
 	}
 	if (persist_exists(DELTA_KEY))
 	{
 		delta =  persist_read_bool(DELTA_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read delta from store: %i", delta ? 1 : 0);
 	}
 	if (persist_exists(DONE_KEY))
 	{
 		done =  persist_read_bool(DONE_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read done from store: %i", done ? 1 : 0);
 	}
 	if (persist_exists(BATTERY_KEY))
 	{
 		battery =  persist_read_bool(BATTERY_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read battery from store: %i", battery ? 1 : 0);
 	}
 	if (persist_exists(WARNOWN_KEY))
 	{
 		warnown =  persist_read_bool(WARNOWN_KEY);
-		APP_LOG(APP_LOG_LEVEL_DEBUG, "Read warnown from store: %i", warnown ? 1 : 0);
 	}
-	
+	int base = 1000;
+	int perDayCounter = 0;
+	int totalCounter = 0;
+	char buffer[64];
+  while ( totalCounter < tt_entries &&  base < 8000)
+  {
+    int key = base + perDayCounter++;
+    if (persist_exists(key))
+    {
+      persist_read_string(key,buffer,64);
+      int sh, sm, eh, em;
+      bool own;
+      if (! getTimeData((char *) buffer, &sh, &sm, &eh, &em, &own)) // returns 0 for success
+      {
+      //APP_LOG(APP_LOG_LEVEL_DEBUG,"sh %i sm %i eh %i em %i own %i ", sh, sm, eh,em, own );
+        put_to_list(key, sh, sm, eh, em, own);
+      }
+      totalCounter++;  
+    }
+    else
+    {
+      base += 1000;
+      perDayCounter=0;
+    }
+  }
+  //logTT("handle_init");
+ 	
 
 	window = window_create();
 	window_set_background_color(window, GColorBlack);
@@ -1196,7 +1204,9 @@ static void handle_init() {
 static void handle_deinit()
 {
   freeTT();
-	// Free window
+
+  accel_tap_service_unsubscribe(); //not sure if necessary, but in complete example they use unsubscribe
+	// Free window	
 	window_destroy(window);
 }
 

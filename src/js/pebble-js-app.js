@@ -106,6 +106,7 @@ function prepareConfiguration(serialized_settings) {
   			result[prop]= settings[prop]; //transfer it to result 
   		}
   }
+  //console.log("dataCounter is: " + dataCounter);
   result["0"] = dataCounter; //send back how many entries I have in the timetable 
   //time table has indices like defined in dayKeys see above
   return result;
