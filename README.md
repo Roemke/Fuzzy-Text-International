@@ -1,6 +1,6 @@
 
-Fuzzy Text International Student & Teacher Version
-========================
+Fuzzy Text International TimeTable Edition
+==========================================
 This is heavily based on Fuzzy Text International from Jesse Hallett and
 others 
 
@@ -16,6 +16,7 @@ Additions (optional):
 
 
 -----------------------------------------------------
+
 original README.md
 
 This is a watchface for the [Pebble][].  It is originally based on the

@@ -10,7 +10,7 @@ watch and then load it again from your locker.
 The iOS version has to go through the Apple Store approval process - so
 there will be a delay before iOS users are able to download the latest
 version.  Wait for the Pebble app to update, then try updating the
-watchface. (original comment)
+watchface. (original comment, I havn't access to an iphone)
 
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
@@ -24,8 +24,8 @@ version 1.3
 --------------
 Start version of "my app". Based heavily on the original work. I needed an
 example to look how it works and after that I have some ideas to fit the 
-app to my needs. So it becomes an extended version called Student and Teachers
-version. 
+app to my needs. So it becomes an extended version called TimeTable
+edition. 
 
 Modifications
 
@@ -51,13 +51,14 @@ Additions (configurable)
   (full line - 100 %) 
 - Show delta minutes to exact time as number  (exact - fuzzy ).
   Number is positioned in the middle of the top line or at the right 
-  * means no difference between exact and fuzzy  
+  a *  means no difference between exact and fuzzy  
 - TimeTable. It's possible to define a table per day which represents the lessons.
   Eg: I have to hold a lesson on Monday from 9:45 to 11:15 am -> can put it into the timetable
   and you can mark it at your own lesson (see warnown)
 
   ATTENTION: I haven't put  the timetable into the persistant storage, so if you start the watchface
-  and your mobile is not connected there will be now entries in the timetable (I think I will fix it)
+  and your mobile is not connected there will be now entries in the timetable (I think I will fix it, done 
+  in version 1.3.1)
 
  - Option done: 
    If option done is set the watch will display how much time is done in the lesson (left upper corner)

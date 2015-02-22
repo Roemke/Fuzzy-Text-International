@@ -181,3 +181,16 @@ schiebe mal in's git und dann auch auf github
 git add -A
 git commit
 git push origin master
+
+screenshots mit pebble screenshot 
+letzten commit aendern git --amend
+-> vorsicht, damit gibt es manchmal stress, da
+ein diverge von lokal und remote moeglich sind. 
+
+etwas gespielt, dann einige commits "gemerged"
+http://stackoverflow.com/questions/2563632/how-can-i-merge-two-commits-into-one
+
+hatte dann wieder die Abweichung, da niemand an "meinem" remote etwas
+aendern kann: 
+git push -f origin master
+
