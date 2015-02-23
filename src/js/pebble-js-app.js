@@ -1,4 +1,4 @@
-var VERSION = "1.3";
+var VERSION = "1.3.1";
 
 var isReady = false;
 var callbacks = []; //stack for callbacks

@@ -50,7 +50,7 @@
 	var getObject = {};
 	var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     var dayKeys = [1000,2000,3000,4000,5000,6000,7000];
-	var LATEST = "1.3";
+	var LATEST = "1.3.1";
 
 	function saveOptions() {
 		var params = {}; //read content of #config as array
@@ -184,7 +184,12 @@ function fillGetObject()
 	{
 		var pair = getArr[i].split('=');
 		if (pair.length != 2) continue
-		getObject[pair[0]] = JSON.parse(decodeURIComponent(pair[1]));
+		
+		var urlPart = decodeURIComponent( pair[1] ) ;
+		if (pair[0] != 'v') //version	
+			getObject[pair[0]] = JSON.parse(urlPart);
+		else 
+			getObject[pair[0]] = urlPart;
 		//hmm, mit 1.3.1 (eh nicht erlaubt) gibt es aerger
 		//vielleicht hat original-autor deshalb speziellen parse-Ausdruck
 		//veraendert
@@ -197,13 +202,15 @@ function fillGetObject()
 		getObject.v = getObject.v.toString();
 }
 
+
+/*
 function parseVersion(verStr) {
 	var parts = verStr.split('.');
 	return parts.reduce(function(sum, part) {
-		return (sum * 1000) + parseInt(part, 10);
+		return (sum * 10) + parseInt(part);
 			}, 0);
 }
-
+*/
 //first bind on mobileinit and after that load jquery mobile, no use
 //pagecreate
 $(document).on('pagecreate','#optionPage', function() {
@@ -211,10 +218,11 @@ $(document).on('pagecreate','#optionPage', function() {
 	fillGetObject();
 	
 	var version = getObject.v;
-	//$('#out').append("Version is " + version+'<br>');
+	$('.versionString').text(version);
+	$('.latestVersion').text(LATEST);
 	//$('#out').append("Opt " + JSON.stringify(getObject.options) +'<br>');
 	
-	if (!version || (parseVersion(version) < parseVersion(LATEST))) {
+	if (!version || (version !=  LATEST) ) {
 		$('#update-available').removeClass('hidden');
 	}
 	else {
@@ -255,14 +263,14 @@ $(document).on('pagecreate','#optionPage', function() {
 		</div>
 		<div data-role="content">
 			<div id="update-available" class="hidden bg-danger">
-				There is a new version of Fuzzy Text International S &amp; T
-				available - some settings will not work until you update to
-				the new version. <a rel="external" href="CHANGES.html">See
+				Maybe there  is a new version (your version: <span
+				class="versionString">  </span>) of Fuzzy Text International S &amp; T
+				available. Latest Version: <span class="latestVersion"> </span>.  <a rel="external" href="CHANGES.html">See
 				details</a>
 			</div>
 
 			<div id="up-to-date" class="hidden bg-info" >
-				Your version of Fuzzy Text International is up-to-date.
+				Your version <span class="versionString"> </span> of Fuzzy Text International is up-to-date.
 				<a rel="external" href="CHANGES.html">See changes</a>
 			</div>
 
