@@ -17,7 +17,8 @@ var langs = {
   es:    4,
   fr:    5,
   no:    6,
-  sv:    7
+  sv:    7,
+  cl:    8 // custom language
 };
 
 //var dayKeys = [1000,2000,3000,4000,5000,6000,7000]; as defined in configure-fuzzy-text.html 
@@ -33,8 +34,9 @@ function readyCallback(event) {
 
 function showConfiguration(event) {
   onReady(function() {
-    var opts = getOptions();
-    var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
+    var opts = getOptions(); //load from localStorage
+    //var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
+    var url = "http://192.168.2.54/roemke/pebble/fuzzy/configure-fuzzy-text.html";
     Pebble.openURL(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
     console.log(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
   });
@@ -65,7 +67,7 @@ function webviewclosed(event) {
   }
 
   onReady(function() {
-    setOptions(resp);
+    setOptions(resp); //store in local Storage 
     var message = prepareConfiguration(resp);
     transmitConfiguration(message);
   });
@@ -93,10 +95,12 @@ function prepareConfiguration(serialized_settings) {
     "3": settings.delta ? 1 : 0,
     "4": settings.done ? 1 : 0,
     "5": settings.battery ? 1 : 0, 
-    "6": settings.warnown  ? 1 : 0
+    "6": settings.warnown  ? 1 : 0,
   };
+  //handle two array: hours and rels
+  result['7'] = settings.hours.toString("\n");
+  result['8'] = settings.rels.toString("\n");
   //need to append time-table to result, no can't handle that
-  //if I have a timetable I put a note into result
   var dataCounter = 0; 
   for (var prop in settings)
   {
@@ -104,7 +108,7 @@ function prepareConfiguration(serialized_settings) {
   		{
   			dataCounter++;
   			result[prop]= settings[prop]; //transfer it to result 
-  		}
+  		} //all strings wich are submitted to the c-Programm (timetable
   }
   //console.log("dataCounter is: " + dataCounter);
   result["0"] = dataCounter; //send back how many entries I have in the timetable 
@@ -145,6 +149,6 @@ Pebble.addEventListener("webviewclosed", webviewclosed);
 
 onReady(function(event) {
   var message = prepareConfiguration(getOptions());
-  transmitConfiguration(message);
+  //transmitConfiguration(message); don't commit setting after loading js app
 });
 

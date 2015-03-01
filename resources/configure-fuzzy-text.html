@@ -46,7 +46,7 @@
 		}
 	</style>
 	<!-- change it to own hosted jquery script -->
-	<script type = "text/javascript">
+	<script type="text/javascript">
 	var getObject = {};
 	var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     var dayKeys = [1000,2000,3000,4000,5000,6000,7000];
@@ -70,32 +70,7 @@
 			done: params.done === 'on',
 			warnown: params.warnown === 'on'
 		};
-		//now read the table data
-		/*
-		options.timeTable = {};//need to be object, new Array does not work, think array is index based, no strings possible
-		//JSON.stringify has problems with new Array instead of object 
-		for (var i = 0; i < days.length; ++i)
-		{
-			var tableRows = $('#tt'+days[i] + ' tr');
-			if (tableRows.length > 1) //have entries 
-			{
-				options.timeTable[days[i]] = new Array();
-				for (var j= 1; j < tableRows.length; ++j)
-				{
-					var tds = $(tableRows[j]).find('td');
-					options.timeTable[days[i]][j-1]={'start': $(tds[0]).html(), 
-					                     'end':   $(tds[1]).html(),
-					                     'own': $(tds[2]).find('input').prop('checked') 
-					                     };
-				}
-			}	
-		
-		//console.log(options); //ok, is nice and can be serialized, but this form has to be converted
-		//on pebble-js-app to  send via bluetooth, 
-		//so I would say I start on 1000 for Monday, 2000 for thursday and so on to have a key for the
-		//dates no, I cant't do it with AppSync, nevertheless I transfer it here and in pebble-js-app 
-		//but I think it will work with AppMessage in one call, 2k schould be enough
-		*/
+		//read the data from the Timetable
 		for (var i = 0; i < days.length; ++i)
 		{
 			var tableRows = $('#tt'+days[i] + ' tr');
@@ -109,7 +84,38 @@
 					 + "|" +  $(tds[1]).html() + "|" + ( $(tds[2]).find('input').prop('checked') ? 1 : 0 ); 
 				}  
 			}
-		}			
+		}	
+	  //if we have a custom language read the data out of the textarea
+	  if (options.lang == 'cl')
+	  {
+	  	console.log("custom language");
+	  	var hours = new Array();
+	  	var hoursS = $('#taHours').val();
+	  	//console.log(hoursS);
+	  	var tempArray = hoursS.split('\n');
+	  	for (var i = 0; i < tempArray.length; ++i)
+	  	{
+	  		var s = tempArray[i].trim();
+	  		if (s.indexOf('//') != 0 )
+	  			hours.push(s);
+	  	}
+	  	console.log("hours: " + hours.length);
+	  	if (hours.length != 24)
+	  		throw "Custom Language, wrong number of hours";
+	  	var rels = new Array();
+	  	tempArray = $('#taRels').val().split('\n');
+	  	for (var i = 0; i < tempArray.length; ++i)
+	  	{
+	  		var s = tempArray[i].trim();
+	  		if (s.indexOf('//') != 0 )
+	  			rels.push(s);
+	  	}
+	  	if (rels.length != 12)
+	  		throw "Custom Language, wrong number of entries for each hour";
+
+	  	options.hours = hours;
+	  	options.rels  = rels;
+	  } 		
 		return options;
 	}
 
@@ -186,8 +192,16 @@ function fillGetObject()
 		if (pair.length != 2) continue
 		
 		var urlPart = decodeURIComponent( pair[1] ) ;
-		if (pair[0] != 'v') //version	
-			getObject[pair[0]] = JSON.parse(urlPart);
+		if (pair[0] != 'v') //version
+    {
+			try	{	
+				getObject[pair[0]] = JSON.parse(urlPart);
+		  }
+			catch(err){
+				console.log(err);
+			}
+			
+		}
 		else 
 			getObject[pair[0]] = urlPart;
 		//hmm, mit 1.3.1 (eh nicht erlaubt) gibt es aerger
@@ -238,9 +252,18 @@ $(document).on('pagecreate','#optionPage', function() {
 	handleTimeTableSettings();
 	//----------------------------
 	$(document).on("vclick",".b-submit",function() {
-		var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(saveOptions()));
-		//console.log(location);
-		document.location = location;
+	  try {
+			var jsonAsString = saveOptions();
+			var location = "pebblejs://close#" +
+											encodeURIComponent(JSON.stringify(jsonAsString));
+			console.log(jsonAsString);
+			//document.location = location;
+		}
+		catch (err){
+		  $('#out').removeClass('bg-info').addClass('bg-danger');
+			$('#out').html("There was a problem with the custom language: <br>" +
+			err + "<br> Settings are not saved");
+		}
 	});
 	$(document).on("vclick",".b-cancel",function() {
 		var location = "pebblejs://close";
@@ -326,6 +349,10 @@ $(document).on('pagecreate','#optionPage', function() {
 					</legend>
 					<div data-role="controlgroup">
 							<label>
+								<input type="radio" name="lang" value="cl" />
+								Custom see CusLa  </label>
+							<label>
+
 								<input type="radio" name="lang" value="ca" />
 								Català </label>
 							<label>
@@ -357,10 +384,13 @@ $(document).on('pagecreate','#optionPage', function() {
 			<div data-role="navbar">
 				<ul>
 					<li>
-						<a data-role="button"   class="b-cancel">Cancel</a>
+						<a data-role="button"   href='#ttPage'>Time Table</a>
 					</li>
 					<li>
-						<a data-role="button"   href='#ttPage'>Time Table</a>
+						<a data-role="button"   href='#clPage'>CusLa</a>
+					</li>
+					<li>
+						<a data-role="button"   class="b-cancel">Cancel</a>
 					</li>
 					<li>
 						<a data-role="button"   class="b-submit">Save</a>
@@ -368,6 +398,7 @@ $(document).on('pagecreate','#optionPage', function() {
 				</ul>
 			</div>
 		</div><!-- /footer -->
+		<!-- pop up needs to be in same page, here it is now problem, need dialog only on this page -->
 	</div>
 	<!-- page ende -->
 	<script>
@@ -443,6 +474,13 @@ $(document).on('pagecreate','#optionPage', function() {
 						$('#tt'+day).append(thisRows.clone());
 					});
       });
+      $('#transferDialog').popup(
+			{
+					afteropen: function(event,ui)
+					{
+							$('#popUpTransferOk').data('day',day);
+					}
+			});
       $('#ttContent').on('vclick', 'button.ctransfer', function() {
          var day = $(this).attr('id');
          var count = $('#tt'+day +' tr.time-data').length;
@@ -458,13 +496,8 @@ $(document).on('pagecreate','#optionPage', function() {
 							}
 					 }
 					 $('#transferDays input').checkboxradio();
-					 $('#transferDialog').popup(
-					 		{
-					 			afteropen: function(event,ui)
-					 			{
-					 				$('#popUpTransferOk').data('day',day);
-					 			}
-					 		}).popup('open');
+					 
+					 	$('#transferDialog').popup('open');
          }      	
       });
            
@@ -541,7 +574,6 @@ $(document).on('pagecreate','#optionPage', function() {
 				</legend>
 			</fieldset>
 		</div><!-- content -->
-
 		<div data-role="footer">
 			<div data-role="navbar">
 				<ul>
@@ -557,12 +589,13 @@ $(document).on('pagecreate','#optionPage', function() {
 				</ul>
 			</div><!-- navbar -->
 		</div><!-- /footer -->
+
 		<!-- pop up needs to be in same page, here it is now problem, need dialog only on this page -->
 		<div data-role='popup' id='timeDialog' data-dismissible='false'>
 			<div data-role="header" data-theme="a">
 				<h1>Input Time</h1>
 			</div>
-			<div role="main" class="ui-content">
+			<div data-role="main" class="ui-content">
 				Start- and End-Time of the entry.
 				<form>
 					<div data-role="fieldcontain">
@@ -585,7 +618,7 @@ $(document).on('pagecreate','#optionPage', function() {
 			<div data-role="header" data-theme="a">
 				<h1>Transfer this entries to </h1>
 			</div>
-			<div role="main" class="ui-content">
+			<div data-role="main" class="ui-content">
 				<form>
 					<div id="transferDays" data-role="fieldcontain">
 					</div> <!-- eo fieldcontain -->
@@ -595,6 +628,73 @@ $(document).on('pagecreate','#optionPage', function() {
 			</div> <!-- end of role main -->
 		</div><!-- end of popup -->	
 	</div><!-- end of ttPage -->
+
+  <!-- page for customize Language -->
+	<div data-role="page" id='clPage'> 
+		<div data-role="header">
+			<h1>Customize Language</h1>
+		</div>
+		<!-- header -->
+		<div data-role="content" id='clContent'>
+			<p>You can add your own language, first we need exactly 24 hours
+			<textarea rows=12 id='taHours'>
+// AM hours
+twelve
+one   
+two   
+three 
+four  
+five  
+six   
+seven 
+eight 
+nine  
+ten   
+eleven
+// PM hours
+twelve
+one  
+two  
+three
+four 
+five 
+six  
+seven
+eight
+nine 
+ten     
+eleven</textarea>
+<p>
+Now we need the text for each 5 minutes of an hour,
+ $1 means the current hour, $2 will 
+			be replaced with the next hour. We need exactly 12 entries.
+			</p><p>
+			A * before a word leads to a bold face font (see example)</p> 						
+		<textarea rows=12 id='taRels'>
+*$1 o'clock
+five past *$1
+ten past *$1
+quarter past *$1
+twenty past *$1
+twenty five past *$1
+half past *$1
+twenty five to *$2
+twenty to *$2
+quarter to *$2
+ten to *$2
+five to *$2</textarea>
+		</div><!-- content -->
+		<div data-role="footer">
+			<div data-role="navbar">
+				<ul>
+					<li>
+						<a data-role="button"   href='#optionPage'>Option</a>
+					</li>
+				</ul>
+			</div><!-- navbar -->
+		</div><!-- /footer -->
+	</div><!-- end of clPage -->
+
 	<!-- End Document
 	================================================== -->
 

@@ -25,6 +25,8 @@
 #define DONE_KEY 4  //show minutes done   
 #define BATTERY_KEY 5 // battery bar 
 #define WARNOWN_KEY 6 // warning / vibration 5 minutes before own lessen 
+#define HOURS_KEY 7 // hours in custom language
+#define RELS_KEY 8 // rels in custom language
 #define INVERT_KEY 10 
 //-----------------
 
@@ -52,6 +54,9 @@ static bool done = false; //show minutes done and left
 static bool battery = true; //show bar to indicate accu
 static bool warnown = false;
 static int tt_entries = 0; //how many entries in the TimeTable
+
+static char * customHours[24]={0}; //if we have custom hours, use this 
+static char * customRels[12]={0}; //should be complete 0 
  
 static Language lang = EN_US;
 
@@ -939,6 +944,31 @@ void put_to_list(int key, int sh, int sm, int eh, int em, bool own)
   } //jetzt sollte eingehaengt sein 
 }          
 
+//put string in the form bla \n blub and blob \n xyz to array
+//n is number of words in the array arrOfC, n char * must be
+//present in the array
+//have array of given size of type char *
+void string_to_array(char ** arrOfC, int n, char *string)
+{
+   for (int i=0; i< n; ++i)
+     if (arrOfC[i])
+       free(arrOfC[i]);
+   char * akt = strchr(string, '\n'); 
+   char * prev = string;
+   int i = 0; 
+   while (akt)
+   {
+       int n = akt - prev;
+       arrOfC[i] = (char * ) calloc(n+1, sizeof(char));
+       strncpy(arrOfC[i++],prev, n);
+       prev = akt + 1; 
+       akt = strchr(akt+1,'\n');
+   }
+}
+
+//tuple belongs to an iterator, and it is possible that the
+//space is reused after the receive event is finished
+//so we need to store the values 
 static void process_key_value(Tuple *tuple)
 {
   uint32_t key =  tuple->key;
@@ -987,10 +1017,17 @@ static void process_key_value(Tuple *tuple)
 			persist_write_bool(DONE_KEY, done); //persistent
 			break;
 		case TIMETABLE_KEY:
-		  
 			tt_entries = tuple->value->uint32;
 			persist_write_int(TIMETABLE_KEY, tt_entries); //persistent
 			break;
+		case HOURS_KEY: //long string of hours, separated by \n
+		  persist_write_string(HOURS_KEY, tuple->value->cstring);		  
+		  string_to_array(customHours, 24, tuple->value->cstring);
+		  break;	
+		case RELS_KEY:
+		  persist_write_string(RELS_KEY, tuple->value->cstring);
+		  string_to_array(customRels, 12, tuple->value->cstring);
+		  break;	
 	  default:
 	    //store raw c-string 
 			// must be TTEntry , hmm should we write to persistent storage on watch?

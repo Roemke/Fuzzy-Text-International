@@ -194,3 +194,8 @@ hatte dann wieder die Abweichung, da niemand an "meinem" remote etwas
 aendern kann: 
 git push -f origin master
 
+2015-03-01 geht soweit alles, uhr laeuft, moechte die sprache
+ konfigurierbar machen 
+ bereits einige aenderungen vorgenommen
+ git checkout -b workOnLanguage
+ git commit -a 
