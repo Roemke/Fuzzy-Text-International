@@ -869,6 +869,18 @@ static int getTimeData(char * tupleString, int *sh, int *sm, int *eh, int *em, b
    return res;  
 }
 
+//free arrays, intended to use on customHours and customRels
+	void freeArray(char **arr,int n)
+	{
+	  for (int i = 0; i< n; ++i)
+	  {
+	    if (arr[i])
+	    {
+	      free(arr[i]);
+	      arr[i]=0;
+      }
+    }
+	}  
 //die verkettete Liste freigeben
 static void freeTT()
 {
@@ -888,7 +900,20 @@ static void freeTT()
     }
   }
 }
-
+/* schleife dauert ewig, das bringt es nicht
+static void usedMemory()
+{
+  int totalSize = 0;
+  // Adjust the value (in this example: 2000) to your maximum key that you know you're using in your app
+  for (int i = 0; i < 8000; i++) {
+    if (persist_exists(i)) {
+      int size = persist_get_size(i);
+      totalSize = totalSize + size;
+    }
+  }
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Persistent storage used = %d", totalSize); 
+}
+*/
 static void logTT(const char * fromWhere)
 {
   APP_LOG(APP_LOG_LEVEL_DEBUG," List of TimeTable Entries we are called from %s",fromWhere);
@@ -944,16 +969,15 @@ void put_to_list(int key, int sh, int sm, int eh, int em, bool own)
   } //jetzt sollte eingehaengt sein 
 }          
 
-//put string in the form bla \n blub and blob \n xyz to array
+//put string in the form bla | blub and blob | xyz to array
 //n is number of words in the array arrOfC, n char * must be
 //present in the array
 //have array of given size of type char *
 void string_to_array(char ** arrOfC, int n, char *string)
 {
-   for (int i=0; i< n; ++i)
-     if (arrOfC[i])
-       free(arrOfC[i]);
-   char * akt = strchr(string, '\n'); 
+   APP_LOG(APP_LOG_LEVEL_DEBUG,"in string_to_array with string %s",string);
+   freeArray(arrOfC,n);
+   char * akt = strchr(string, '|'); 
    char * prev = string;
    int i = 0; 
    while (akt)
@@ -962,9 +986,11 @@ void string_to_array(char ** arrOfC, int n, char *string)
        arrOfC[i] = (char * ) calloc(n+1, sizeof(char));
        strncpy(arrOfC[i++],prev, n);
        prev = akt + 1; 
-       akt = strchr(akt+1,'\n');
+       akt = strchr(akt+1,'|');
    }
 }
+
+
 
 //tuple belongs to an iterator, and it is possible that the
 //space is reused after the receive event is finished
@@ -1020,13 +1046,13 @@ static void process_key_value(Tuple *tuple)
 			tt_entries = tuple->value->uint32;
 			persist_write_int(TIMETABLE_KEY, tt_entries); //persistent
 			break;
-		case HOURS_KEY: //long string of hours, separated by \n
-		  persist_write_string(HOURS_KEY, tuple->value->cstring);		  
-		  string_to_array(customHours, 24, tuple->value->cstring);
+		case HOURS_KEY: //long string of hours, separated by |
+		  //persist_write_string(HOURS_KEY, tuple->value->cstring);		  
+		  //string_to_array(customHours, 24, tuple->value->cstring);
 		  break;	
 		case RELS_KEY:
-		  persist_write_string(RELS_KEY, tuple->value->cstring);
-		  string_to_array(customRels, 12, tuple->value->cstring);
+		  //persist_write_string(RELS_KEY, tuple->value->cstring);
+		  //string_to_array(customRels, 12, tuple->value->cstring);
 		  break;	
 	  default:
 	    //store raw c-string 
@@ -1185,6 +1211,23 @@ static void handle_init() {
 	{
 		warnown =  persist_read_bool(WARNOWN_KEY);
 	}
+	if (persist_exists(HOURS_KEY))
+	{
+        int size = persist_get_size(HOURS_KEY);
+        char * tempBuf = (char *) malloc(size+1);	  
+        persist_read_string(HOURS_KEY,tempBuf,size+1);
+        string_to_array(customHours, 24, tempBuf);
+        free(tempBuf);
+	}
+	if (persist_exists(RELS_KEY))
+	{
+        int size = persist_get_size(RELS_KEY);
+        char * tempBuf = (char *) malloc(size+1);	  
+        persist_read_string(RELS_KEY,tempBuf,size+1);
+        string_to_array(customRels, 12, tempBuf);
+        free(tempBuf);
+	}
+	
 	int base = 1000;
 	int perDayCounter = 0;
 	int totalCounter = 0;
@@ -1231,7 +1274,6 @@ static void handle_init() {
 
 	// Subscribe to minute ticks
 	tick_timer_service_subscribe(MINUTE_UNIT, handle_minute_tick);
-
 #if DEBUG
 	// Button functionality
 	window_set_click_config_provider(window, (ClickConfigProvider) click_config_provider);
@@ -1240,9 +1282,11 @@ static void handle_init() {
 
 static void handle_deinit()
 {
-  freeTT();
-
+  
   accel_tap_service_unsubscribe(); //not sure if necessary, but in complete example they use unsubscribe
+	freeTT(); //list
+	freeArray(customHours,24); //array with custom Hours
+	freeArray(customRels,12);
 	// Free window	
 	window_destroy(window);
 }

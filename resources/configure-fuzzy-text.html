@@ -113,8 +113,9 @@
 	  	if (rels.length != 12)
 	  		throw "Custom Language, wrong number of entries for each hour";
 
-	  	options.hours = hours;
-	  	options.rels  = rels;
+	  	options.hours = hours.join('|'); //can't transfer nested objects
+	  	//because of json.stringify ? or json.parse on other side?
+	  	options.rels  = rels.join('|');
 	  } 		
 		return options;
 	}
@@ -256,8 +257,8 @@ $(document).on('pagecreate','#optionPage', function() {
 			var jsonAsString = saveOptions();
 			var location = "pebblejs://close#" +
 											encodeURIComponent(JSON.stringify(jsonAsString));
-			console.log(jsonAsString);
-			//document.location = location;
+			//$('#out').text(JSON.stringify(jsonAsString));
+			document.location = location;
 		}
 		catch (err){
 		  $('#out').removeClass('bg-info').addClass('bg-danger');

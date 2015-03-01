@@ -26,6 +26,7 @@ var langs = {
 function readyCallback(event) {
   isReady = true;
   var callback;
+  console.log("call to readyCallback");
   while (callbacks.length > 0) { //if callbacks on stack, process them
     callback = callbacks.shift();
     callback(event);
@@ -34,6 +35,7 @@ function readyCallback(event) {
 
 function showConfiguration(event) {
   onReady(function() {
+    console.log("showConfiguration");
     var opts = getOptions(); //load from localStorage
     //var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
     var url = "http://192.168.2.54/roemke/pebble/fuzzy/configure-fuzzy-text.html";
@@ -42,6 +44,7 @@ function showConfiguration(event) {
   });
 }
 
+//response from configure-fuzzy-text.html
 function webviewclosed(event) {
   var resp = event.response;
   console.log('configuration response: '+ resp + ' ('+ typeof resp +')');
@@ -52,7 +55,7 @@ function webviewclosed(event) {
     now it looks like:
     response: {"2000":"11:44|12:44|1","2001":"13:44|14:44|0","4000":"13:44|14:44:0","invert":false,"text_align":"right","lang":"de","delta":false,"battery":true} (string)    
    */
- 
+  //if (true) {return;}
   var options = JSON.parse(resp);
   
   //all undefined - return?
@@ -87,6 +90,7 @@ function setOptions(options) {
 // format that is sent back from the configuration web UI.  Produces
 // a JSON message to send to the watch face.
 function prepareConfiguration(serialized_settings) {
+  console.log("In prepare with " + serialized_settings);
   var settings = JSON.parse(serialized_settings);
   var result =  {
     "10": settings.invert ? 1 : 0,
@@ -96,10 +100,9 @@ function prepareConfiguration(serialized_settings) {
     "4": settings.done ? 1 : 0,
     "5": settings.battery ? 1 : 0, 
     "6": settings.warnown  ? 1 : 0,
+    "7": settings.hours ? settings.hours : '',
+    "8": settings.rels ? settings.rels : ''
   };
-  //handle two array: hours and rels
-  result['7'] = settings.hours.toString("\n");
-  result['8'] = settings.rels.toString("\n");
   //need to append time-table to result, no can't handle that
   var dataCounter = 0; 
   for (var prop in settings)
@@ -148,7 +151,7 @@ Pebble.addEventListener("webviewclosed", webviewclosed);
 
 
 onReady(function(event) {
-  var message = prepareConfiguration(getOptions());
+  //var message = prepareConfiguration(getOptions());
   //transmitConfiguration(message); don't commit setting after loading js app
 });
 

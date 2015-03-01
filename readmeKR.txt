@@ -199,3 +199,10 @@ git push -f origin master
  bereits einige aenderungen vorgenommen
  git checkout -b workOnLanguage
  git commit -a 
+
+ git branch zeigt die branches an
+
+
+ umsetzung macht stress, bekomme die Hours und Rels der custom language
+ nicht uebertragen anscheinend von configure zur js-App unklar
+ auf c-seite fehlt noch die Verwendung der Teile 
