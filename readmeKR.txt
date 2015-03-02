@@ -205,4 +205,6 @@ git push -f origin master
 
  umsetzung macht stress, bekomme die Hours und Rels der custom language
  nicht uebertragen anscheinend von configure zur js-App unklar
+ Problem liegt im ' von o'clock Ich kann das durch ein x oder so ersetzen
+ Vorschlag %27 klappt nicht (hatte ich gefunden)
  auf c-seite fehlt noch die Verwendung der Teile 

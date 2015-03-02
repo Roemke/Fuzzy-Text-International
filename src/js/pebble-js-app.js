@@ -40,13 +40,16 @@ function showConfiguration(event) {
     //var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
     var url = "http://192.168.2.54/roemke/pebble/fuzzy/configure-fuzzy-text.html";
     Pebble.openURL(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
-    console.log(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
+    //console.log(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
   });
 }
 
 //response from configure-fuzzy-text.html
 function webviewclosed(event) {
+  console.log("closed event");
   var resp = event.response;
+  console.log("event is " + event);
+  
   console.log('configuration response: '+ resp + ' ('+ typeof resp +')');
  /* leads to eg
     {"invert":false,"text_align":"right","lang":"de","delta":false,"battery":true,
@@ -55,10 +58,10 @@ function webviewclosed(event) {
     now it looks like:
     response: {"2000":"11:44|12:44|1","2001":"13:44|14:44|0","4000":"13:44|14:44:0","invert":false,"text_align":"right","lang":"de","delta":false,"battery":true} (string)    
    */
-  //if (true) {return;}
+  if (true) {return;}
   var options = JSON.parse(resp);
   
-  //all undefined - return?
+  //all undefined - return? - yes it means cancel button
   
   if (typeof options.invert === 'undefined' &&
       typeof options.text_align === 'undefined' &&
