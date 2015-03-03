@@ -207,4 +207,36 @@ git push -f origin master
  nicht uebertragen anscheinend von configure zur js-App unklar
  Problem liegt im ' von o'clock Ich kann das durch ein x oder so ersetzen
  Vorschlag %27 klappt nicht (hatte ich gefunden)
- auf c-seite fehlt noch die Verwendung der Teile 
+ habe jetzt einfac |27 genommen - | verboten, anders nicht hinbekommen
+ auf c-seite fehlt noch die Verwendung der Teile - ok, das ist relativ wenig
+ Array von char * der groesse 24 bzw 12 genommen
+
+ Aerger beim laufen lassen, falls ein ü im Text steht und der ausgegeben
+ wird
+  roemke@kspace42:~/pebble-dev/PebbleSDK-2.9$ joe tools/pebblecomm/pebble.py
+ muss geaendert werden ?
+ log.info("{} {} {}:{}> {}".format(str_level, timestamp_str,filename, linenumber, message.encode('utf-8')))
+ .encode('utf-8') ergaenzt 
+http://forums.getpebble.com/discussion/8582/bug-pebble-logs-fails-with-ascii-codec-cant-encode-character-u-xfc-in-position
+ hat nichts genutzt ist aber auch nur ein debugging fehler
+Noch ein fehler gefunden, falls sprache auf 0 ist, gebe standard-string
+zurueck, auch wenn Sprachauswahl auf cl (custom language) steht
+na, ob das jetzt fehlerfrei ist?
+
+git geschichte
+git checkout master
+git checkout -b version1.3 (jetzt haben wir drei branches)
+git checkout workOnLanguage (textdateien noch etwas anpassen)
+git commit -a --amend
+git branch
+leads to 
+roemke@kspace42:~/pebble-dev/Fuzzy-Text-International-TimeTable$ git branch
+  master
+  version1.3
+* workOnLanguage
+
+git checkout master
+git merge workOnLanguage
+sollte ein fast-forward geben, da nur der zeiger weiter bewegt werden muss
+nein hat er nicht getan
+ 

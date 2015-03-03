@@ -1,4 +1,4 @@
-var VERSION = "1.3.1";
+var VERSION = "1.4";
 
 var isReady = false;
 var callbacks = []; //stack for callbacks
@@ -46,11 +46,13 @@ function showConfiguration(event) {
 
 //response from configure-fuzzy-text.html
 function webviewclosed(event) {
-  console.log("closed event");
+/*  console.log("closed event");
+  for (var props in event)
+  {
+    console.log(props + " with data:" + event[props]);
+  }*/
   var resp = event.response;
-  console.log("event is " + event);
-  
-  console.log('configuration response: '+ resp + ' ('+ typeof resp +')');
+  //console.log('configuration response: '+ resp + ' ('+ typeof resp +')');
  /* leads to eg
     {"invert":false,"text_align":"right","lang":"de","delta":false,"battery":true,
     "timeTable":{"Tue":[{"start":"10:51","end":"11:51","own":false}],"Wed":[{"start":"10:51","end":"11:51","own":true}]}}
@@ -58,11 +60,11 @@ function webviewclosed(event) {
     now it looks like:
     response: {"2000":"11:44|12:44|1","2001":"13:44|14:44|0","4000":"13:44|14:44:0","invert":false,"text_align":"right","lang":"de","delta":false,"battery":true} (string)    
    */
-  if (true) {return;}
+  resp = resp.replace("|27","'"); 
   var options = JSON.parse(resp);
-  
+  //console.log(options.hours);
+  //console.log(options.rels);  
   //all undefined - return? - yes it means cancel button
-  
   if (typeof options.invert === 'undefined' &&
       typeof options.text_align === 'undefined' &&
       typeof options.lang === 'undefined' &&
@@ -93,7 +95,7 @@ function setOptions(options) {
 // format that is sent back from the configuration web UI.  Produces
 // a JSON message to send to the watch face.
 function prepareConfiguration(serialized_settings) {
-  console.log("In prepare with " + serialized_settings);
+  //console.log("In prepare with " + serialized_settings);
   var settings = JSON.parse(serialized_settings);
   var result =  {
     "10": settings.invert ? 1 : 0,
@@ -103,8 +105,8 @@ function prepareConfiguration(serialized_settings) {
     "4": settings.done ? 1 : 0,
     "5": settings.battery ? 1 : 0, 
     "6": settings.warnown  ? 1 : 0,
-    "7": settings.hours ? settings.hours : '',
-    "8": settings.rels ? settings.rels : ''
+    "7": settings.hours ? settings.hours.join('|') : '',
+    "8": settings.rels ? settings.rels.join('|') : ''
   };
   //need to append time-table to result, no can't handle that
   var dataCounter = 0; 
@@ -124,7 +126,7 @@ function prepareConfiguration(serialized_settings) {
 
 // Takes a JSON message as input.  Sends the message to the watch.
 function transmitConfiguration(settings) {
-  console.log('sending message: '+ JSON.stringify(settings));
+  //console.log('sending message: '+ JSON.stringify(settings));
   Pebble.sendAppMessage(settings, function(event) {
     // Message delivered successfully
   }, logError);

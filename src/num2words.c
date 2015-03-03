@@ -9,6 +9,8 @@
 #include "strings-sv.h"
 #include "string.h"
 
+extern char * customHours[24];
+extern char * customRels[12];
 
 size_t min(const size_t a, const size_t b) {
   return a < b ? a : b;
@@ -71,6 +73,12 @@ const char* get_hour(Language lang, int index) {
     case SV:
       return HOURS_SV[index];
       break;
+    case CL: //custom language
+      if (customHours[index])
+        return customHours[index];
+      else
+        return HOURS_EN_US[index];
+      break;
     default:
       return HOURS_EN_US[index];
   }
@@ -98,6 +106,12 @@ const char* get_rel(Language lang, int index) {
       break;
     case SV:
       return RELS_SV[index];
+      break;
+    case CL: //custom
+      if (customRels[index])
+        return customRels[index];
+      else
+        return RELS_EN_US[index];
       break;
     default:
       return RELS_EN_US[index];

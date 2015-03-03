@@ -9,7 +9,8 @@ typedef enum {
   ES    = 0x4,
   FR    = 0x5,
   NO    = 0x6,
-  SV    = 0x7
+  SV    = 0x7,
+  CL    = 0x8 //custom language
 } Language;
 
 int time_to_words(Language lang, int hours, int minutes, int seconds, char* words, size_t length);

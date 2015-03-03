@@ -50,7 +50,7 @@
 	var getObject = {};
 	var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     var dayKeys = [1000,2000,3000,4000,5000,6000,7000];
-	var LATEST = "1.3.1";
+	var LATEST = "1.4";
 
 	function saveOptions() {
 		var params = {}; //read content of #config as array
@@ -71,6 +71,7 @@
 			warnown: params.warnown === 'on'
 		};
 		//read the data from the Timetable
+		
 		for (var i = 0; i < days.length; ++i)
 		{
 			var tableRows = $('#tt'+days[i] + ' tr');
@@ -84,7 +85,8 @@
 					 + "|" +  $(tds[1]).html() + "|" + ( $(tds[2]).find('input').prop('checked') ? 1 : 0 ); 
 				}  
 			}
-		}	
+		}
+			
 	  //if we have a custom language read the data out of the textarea
 	  if (options.lang == 'cl')
 	  {
@@ -113,9 +115,10 @@
 	  	if (rels.length != 12)
 	  		throw "Custom Language, wrong number of entries for each hour";
 
-	  	options.hours = hours.join('|'); //can't transfer nested objects
+	  	options.hours = hours;//.join('|'); //can't transfer nested objects
 	  	//because of json.stringify ? or json.parse on other side?
-	  	options.rels  = rels.join('|');
+	  	//no, my mistake - it works
+	  	options.rels  = rels;//.join('|');
 	  } 		
 		return options;
 	}
@@ -254,10 +257,17 @@ $(document).on('pagecreate','#optionPage', function() {
 	//----------------------------
 	$(document).on("vclick",".b-submit",function() {
 	  try {
-			var jsonAsString = saveOptions();
-			var location = "pebblejs://close#" +
-											encodeURIComponent(JSON.stringify(jsonAsString));
-			//$('#out').text(JSON.stringify(jsonAsString));
+			var jsonAsString = JSON.stringify(saveOptions());
+			jsonAsString=jsonAsString.replace("'","|27");
+			var location = jsonAsString;
+			location = "pebblejs://close#" +
+											encodeURIComponent(location);
+			//it's really ugly - can't transfer ' in o'clock
+			//javascript app crashs without any response
+			//can't masquerade it as %27 which is the "normal" represantation,
+			//so code it as |27 which will work but so |27  ist not allowed as
+			//text (| is not allowed as text because if I transfer from js app to 
+			//c-prog I need a seperator - use |
 			document.location = location;
 		}
 		catch (err){
@@ -637,34 +647,39 @@ $(document).on('pagecreate','#optionPage', function() {
 		</div>
 		<!-- header -->
 		<div data-role="content" id='clContent'>
-			<p>You can add your own language, first we need exactly 24 hours
+			<p>You can add your own language. Limitation: character | is not
+			allowed.  This example is bavarian from
+http://www.bayrisch-lernen.de/popups/uhrzeit.html
+and			http://himbeerwerft.de/2013/10/bayrische-uhrzeiten/<br>
+	(To every real bavarian: excuse me, if the translation ist to bad :-))<br>
+			First we need exactly 24 hours:
 			<textarea rows=12 id='taHours'>
-// AM hours
-twelve
-one   
-two   
-three 
-four  
-five  
-six   
-seven 
-eight 
-nine  
-ten   
-eleven
+// AM hours, start at midnight
+Zwoife
+Oans
+Zwoa
+Drei
+Viere
+Fuemfe
+Sechse
+Sieme
+Achte
+Neine
+Zehne
+Eife
 // PM hours
-twelve
-one  
-two  
-three
-four 
-five 
-six  
-seven
-eight
-nine 
-ten     
-eleven</textarea>
+Zwoife
+Oans
+Zwoa
+Drei
+Viere
+Fuemfe
+Sechse
+Sieme
+Achte
+Neine
+Zehne
+Eife</textarea>
 <p>
 Now we need the text for each 5 minutes of an hour,
  $1 means the current hour, $2 will 
@@ -672,18 +687,18 @@ Now we need the text for each 5 minutes of an hour,
 			</p><p>
 			A * before a word leads to a bold face font (see example)</p> 						
 		<textarea rows=12 id='taRels'>
-*$1 o'clock
-five past *$1
-ten past *$1
-quarter past *$1
-twenty past *$1
-twenty five past *$1
-half past *$1
-twenty five to *$2
-twenty to *$2
-quarter to *$2
-ten to *$2
-five to *$2</textarea>
+jetz isses *$1
+fuemf noch *$1
+zehn noch *$1
+viertel noch *$1
+zwanzg noch *$1
+fuemf voa hoibe *$2
+hoibe *$2
+fuemf noch hoibe *$2
+zwanzg voa *$2
+dreiviertl *$2
+zehn auf *$2
+fuemf auf *$2</textarea>
 		</div><!-- content -->
 		<div data-role="footer">
 			<div data-role="navbar">

@@ -55,8 +55,8 @@ static bool battery = true; //show bar to indicate accu
 static bool warnown = false;
 static int tt_entries = 0; //how many entries in the TimeTable
 
-static char * customHours[24]={0}; //if we have custom hours, use this 
-static char * customRels[12]={0}; //should be complete 0 
+char * customHours[24]={0}; //if we have custom hours, use this 
+char * customRels[12]={0}; //should be complete 0 
  
 static Language lang = EN_US;
 
@@ -969,25 +969,44 @@ void put_to_list(int key, int sh, int sm, int eh, int em, bool own)
   } //jetzt sollte eingehaengt sein 
 }          
 
+//log array content 
+void log_array(char ** arrOfC, int n )
+{
+  for (int i = 0; i< n; ++i)
+  {
+    if (arrOfC[i]) //problem with german umlauts - raus 
+      APP_LOG(APP_LOG_LEVEL_DEBUG,"found entry %d ", i);
+    else
+      APP_LOG(APP_LOG_LEVEL_DEBUG,"entry %d is not set", i);
+  }
+}
 //put string in the form bla | blub and blob | xyz to array
 //n is number of words in the array arrOfC, n char * must be
 //present in the array
 //have array of given size of type char *
 void string_to_array(char ** arrOfC, int n, char *string)
 {
-   APP_LOG(APP_LOG_LEVEL_DEBUG,"in string_to_array with string %s",string);
    freeArray(arrOfC,n);
    char * akt = strchr(string, '|'); 
    char * prev = string;
    int i = 0; 
-   while (akt)
+   while (akt && i < n-1)
    {
-       int n = akt - prev;
-       arrOfC[i] = (char * ) calloc(n+1, sizeof(char));
-       strncpy(arrOfC[i++],prev, n);
+       int size = akt - prev;
+       if (arrOfC[i])       
+         free(arrOfC[i]);
+       arrOfC[i] = (char * ) calloc(size+1, sizeof(char));
+       strncpy(arrOfC[i++],prev, size);
        prev = akt + 1; 
        akt = strchr(akt+1,'|');
    }
+   //letzten holen
+   int size = string + strlen(string) - prev;
+   if (arrOfC[i])
+     free(arrOfC[i]);
+   arrOfC[i] = (char * ) calloc(size+1, sizeof(char));
+   strcpy(arrOfC[i++],prev); 
+   log_array(arrOfC,i);
 }
 
 
@@ -1047,12 +1066,14 @@ static void process_key_value(Tuple *tuple)
 			persist_write_int(TIMETABLE_KEY, tt_entries); //persistent
 			break;
 		case HOURS_KEY: //long string of hours, separated by |
-		  //persist_write_string(HOURS_KEY, tuple->value->cstring);		  
-		  //string_to_array(customHours, 24, tuple->value->cstring);
+		  persist_write_string(HOURS_KEY, tuple->value->cstring);		  
+		  string_to_array(customHours, 24, tuple->value->cstring);
 		  break;	
 		case RELS_KEY:
-		  //persist_write_string(RELS_KEY, tuple->value->cstring);
-		  //string_to_array(customRels, 12, tuple->value->cstring);
+		  persist_write_string(RELS_KEY, tuple->value->cstring);
+		  string_to_array(customRels, 12, tuple->value->cstring);
+      //APP_LOG(APP_LOG_LEVEL_DEBUG,"received RELS %s", tuple->value->cstring);
+      //APP_LOG(APP_LOG_LEVEL_DEBUG,"length is  %d", strlen(tuple->value->cstring));
 		  break;	
 	  default:
 	    //store raw c-string 
@@ -1211,6 +1232,7 @@ static void handle_init() {
 	{
 		warnown =  persist_read_bool(WARNOWN_KEY);
 	}
+	
 	if (persist_exists(HOURS_KEY))
 	{
         int size = persist_get_size(HOURS_KEY);
@@ -1254,7 +1276,8 @@ static void handle_init() {
     }
   }
   //logTT("handle_init");
- 	
+ 	//log_array(customHours,24);
+ 	//log_array(customRels,12);
 
 	window = window_create();
 	window_set_background_color(window, GColorBlack);
@@ -1294,6 +1317,7 @@ static void handle_deinit()
 int main(void)
 {
 	handle_init();
+	
 	app_event_loop();
 	handle_deinit();
 }
