@@ -238,5 +238,17 @@ roemke@kspace42:~/pebble-dev/Fuzzy-Text-International-TimeTable$ git branch
 git checkout master
 git merge workOnLanguage
 sollte ein fast-forward geben, da nur der zeiger weiter bewegt werden muss
-nein hat er nicht getan
+nein hat er nicht getan, warum auch immer sieht auf jeden fall ok aus
+aktuell:
+git branch
+* master
+  version1.3
+  workOnLanguage
+-> kann workOnLanguage loeschen
+git branch -d workOnLanguage
+-> klappt nicht, da nicht vollständig zusammengefügt, hmm warum, naja,
+weil ich inzwischen aenderungen vorgenommen habe, ich haette den branch
+sofort nach dem mergen loeschen sollen
+git branch -D workOnLanguage geht, sollte auch ok sein, habe zur 
+sicherheit mal vorher manuelles backup angelegt
  

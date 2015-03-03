@@ -37,8 +37,8 @@ function showConfiguration(event) {
   onReady(function() {
     console.log("showConfiguration");
     var opts = getOptions(); //load from localStorage
-    //var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
-    var url = "http://192.168.2.54/roemke/pebble/fuzzy/configure-fuzzy-text.html";
+    var url  = "http://zb42.de/pebble/fuzzy/configure-fuzzy-text.html";
+    //var url = "http://192.168.2.54/roemke/pebble/fuzzy/configure-fuzzy-text.html";
     Pebble.openURL(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
     //console.log(url + "#v=" + encodeURIComponent(VERSION) + "&options=" + encodeURIComponent(opts));
   });

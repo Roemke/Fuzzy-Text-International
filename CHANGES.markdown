@@ -4,7 +4,7 @@
 Changes
 ========
 
-The latest version is 1.3(.1)  To update, remove the watchface from your
+The latest version is 1.4  To update, remove the watchface from your
 watch and then load it again from your locker.
 
 The iOS version has to go through the Apple Store approval process - so
@@ -14,6 +14,18 @@ watchface. (original comment, I havn't access to an iphone)
 
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
+
+version 1.4
+--------------
+It's possible to customize an own language. In Settings on phone
+you can use Language type custom and by using the CusLa Tab 
+you can edit two textareas with your language entries. Added an example of 
+bavarian language.
+
+This version is not really tested, I'm still in the process of learning
+(ok, will never stop it ...) and I need to handle with some dynamic memory
+allocation which always can cause prolems. If you had problems with a 
+custom language write an email to me.
 
 version 1.3.1
 --------------

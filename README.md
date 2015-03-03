@@ -13,7 +13,7 @@ Additions (optional):
 - shows amount of time which has passed / left in lesson
   or start of next lesson
 - warns / vibrates 5 minutes before next lesson
-
+- customize an own language
 
 -----------------------------------------------------
 

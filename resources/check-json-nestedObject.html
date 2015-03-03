@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<head>
+	<!-- page must be copied to a webserver -->
+	<!-- Basic Page Needs
+	================================================== -->
+	<meta charset="utf-8">
+	<title>check json</title>
+	<meta name="description" content="configuration page for Fuzzy Text International
+	S & T version , a Pebble watchface">
+
+	<!-- Mobile Specific Metas
+	================================================== -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+	<!-- use jquery mobile -->
+	<link rel="stylesheet" type="text/css" href="js/jquerymobile/jquery.mobile-1.4.4.min.css">
+	<script src="js/jquery-1.11.0.min.js" type="text/javascript"></script>
+	<style type="text/css">
+		.hidden {
+			display: none;
+		}
+		.bg-info, .bg-danger {
+			border: 1px solid #111;
+			padding: 2px;
+			width: 90%;
+			background-color: #fafffa;
+			margin-left: auto;
+			margin-right: auto;
+		}
+		.bg-danger {
+			background-color: #fffafa;
+		}
+	</style>
+	<!-- change it to own hosted jquery script -->
+	<script type="text/javascript">
+$(document).on('pagecreate','#optionPage', function() {
+	
+	//----------------------------
+	$(document).on("vclick",".b-submit",function() {
+	  //it works so I've a wrong memory in mind - stringify works on 
+	  //nested objects
+		var bla ={eins: 1, zwei: 3 , doof: true};
+		bla.blub = {blubeins:1, blubdoof: false};
+		console.log(bla);
+		console.log(JSON.stringify(bla));
+    var blaDecoded = JSON.parse(JSON.stringify(bla));
+    console.log(blaDecoded);
+
+	});
+});
+	</script>
+
+	<script src="js/jquerymobile/jquery.mobile-1.4.4.min.js" type="text/javascript"></script>
+
+</head>
+<body>
+	<!-- Primary Page Layout
+	================================================== -->
+	<div data-role="page" id="optionPage">
+		<div data-role="header">
+			<h1>Configure Fuzzy Text Int'l Student &amp; Teacher version</h1>
+			Configuration utility for the Student &amp; Teachers version of Fuzzy
+			Text International
+		</div>
+		<div data-role="content">
+			<div id="update-available" class="hidden bg-danger">
+				Maybe there  is a new version (your version: <span
+				class="versionString">  </span>) of Fuzzy Text International S &amp; T
+				available. Latest Version: <span class="latestVersion"> </span>.  <a rel="external" href="CHANGES.html">See
+				details</a>
+			</div>
+
+			<div id="up-to-date" class="hidden bg-info" >
+				Your version <span class="versionString"> </span> of Fuzzy Text International is up-to-date.
+				<a rel="external" href="CHANGES.html">See changes</a>
+			</div>
+
+			<div id='out' class='bg-info '></div>
+		</div><!-- data-role content -->
+		<div data-role="footer">
+			<div data-role="navbar">
+				<ul>
+					<li>
+						<a data-role="button"   class="b-submit">Save</a>
+					</li>
+				</ul>
+			</div>
+		</div><!-- /footer -->
+	</div><!-- end of ttPage -->
+
+	<!-- End Document
+	================================================== -->
+</body>
+</html>
