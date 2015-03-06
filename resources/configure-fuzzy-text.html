@@ -291,14 +291,14 @@ $(document).on('pagecreate','#optionPage', function() {
 	================================================== -->
 	<div data-role="page" id="optionPage">
 		<div data-role="header">
-			<h1>Configure Fuzzy Text Int'l Student &amp; Teacher version</h1>
-			Configuration utility for the Student &amp; Teachers version of Fuzzy
+			<h1>Configure Fuzzy Text Int'l Timetable  edition</h1>
+			Configuration utility for the TimeTable Edition of Fuzzy
 			Text International
 		</div>
 		<div data-role="content">
 			<div id="update-available" class="hidden bg-danger">
 				Maybe there  is a new version (your version: <span
-				class="versionString">  </span>) of Fuzzy Text International S &amp; T
+				class="versionString">  </span>) of Fuzzy Text International TTE
 				available. Latest Version: <span class="latestVersion"> </span>.  <a rel="external" href="CHANGES.html">See
 				details</a>
 			</div>
@@ -485,13 +485,6 @@ $(document).on('pagecreate','#optionPage', function() {
 						$('#tt'+day).append(thisRows.clone());
 					});
       });
-      $('#transferDialog').popup(
-			{
-					afteropen: function(event,ui)
-					{
-							$('#popUpTransferOk').data('day',day);
-					}
-			});
       $('#ttContent').on('vclick', 'button.ctransfer', function() {
          var day = $(this).attr('id');
          var count = $('#tt'+day +' tr.time-data').length;
@@ -507,8 +500,8 @@ $(document).on('pagecreate','#optionPage', function() {
 							}
 					 }
 					 $('#transferDays input').checkboxradio();
-					 
-					 	$('#transferDialog').popup('open');
+					 $('#popUpTransferOk').data('day',day);
+					 $('#transferDialog').popup('open');
          }      	
       });
            
@@ -519,7 +512,7 @@ $(document).on('pagecreate','#optionPage', function() {
 				var id = $(this).attr('id');
 				var day = id.substring(5);
 				var table = '#tt' + day;
-				//var parent = $(this).parents('tr');
+				//var parent = $(this).pare	nts('tr');
 				$('#popUpOk').off();
 				$('#popUpOk').on('vclick', function() {
 					//console.log("popup closed with ok");

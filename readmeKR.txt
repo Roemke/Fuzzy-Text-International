@@ -251,4 +251,5 @@ weil ich inzwischen aenderungen vorgenommen habe, ich haette den branch
 sofort nach dem mergen loeschen sollen
 git branch -D workOnLanguage geht, sollte auch ok sein, habe zur 
 sicherheit mal vorher manuelles backup angelegt
- 
+noch ein fehler bei popup timetablen - den habe ich später selbst herein
+gebaut 
