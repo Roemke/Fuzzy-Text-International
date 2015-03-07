@@ -31,6 +31,9 @@ function readyCallback(event) {
     callback = callbacks.shift();
     callback(event);
   }
+  
+  //try to send a message 
+  //Pebble.showSimpleNotificationOnPebble(title, text);
 }
 
 function showConfiguration(event) {
