@@ -156,7 +156,49 @@ function onReady(callback) {
 Pebble.addEventListener("ready", readyCallback); //called when app is loaded on watch
 Pebble.addEventListener("showConfiguration", showConfiguration);
 Pebble.addEventListener("webviewclosed", webviewclosed);
-
+//and one for message send from pebble
+//ack is send by pebble js, we don't have to care for it 
+//bad luck, api is not supported, maybe later
+Pebble.addEventListener('appmessage',
+  function(e) {
+      console.log('Received message: '); //ack will be send automatically
+      var payload = e.payload;
+      if (payload)
+      {
+        if (payload.SEND_BATTERY_KEY)
+        {
+          console.log("received request for battery status");
+          for (var prop in navigator)
+          {
+            console.log(prop + " with " + navigator[prop]);
+          }
+          var bat = navigator.battery || navigator.webkitBattery || navigator.mozBattery; //old style
+          if (bat)
+          {
+            Pebble.sendAppMessage({ 'BATTERY_LEVEL_KEY': parseInt(bat.level*100) });
+            console.log("send battery level " + parseInt(bat.level *100));
+          }
+          else
+          {//ok this is the result, no battery object in sandbox of pebble app :-(
+            console.log("no battery object");
+            if (navigator.getBattery)
+            {
+              navigator.getBattery().then(
+                  function(bat)
+                        {
+                          console.log("found new style bat object");
+                        });
+            }
+            else 
+            {
+              console.log("no new style bat object");
+            }
+          }
+        }
+      }
+  }
+);
+        
 
 onReady(function(event) {
   //var message = prepareConfiguration(getOptions());

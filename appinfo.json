@@ -9,7 +9,10 @@
     "watchface": true
   },
   "capabilities": [ "configurable" ],
-  "appKeys": {},
+  "appKeys": {
+		"SEND_BATTERY_KEY": 1,
+    "BATTERY_LEVEL_KEY": 20
+	},
   "resources": {
     "media": []
   }

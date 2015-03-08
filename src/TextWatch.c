@@ -28,8 +28,14 @@
 #define HOURS_KEY 7 // hours in custom language
 #define RELS_KEY 8 // rels in custom language
 #define INVERT_KEY 10 
+#define BATTERY_LEVEL_KEY 20 //
 //-----------------
+//keys which are get on JavaScript side, should be only one
+#define SEND_BATTERY_KEY 1 
 
+
+
+//---------------------
 #define TEXT_ALIGN_CENTER 0
 #define TEXT_ALIGN_LEFT 1
 #define TEXT_ALIGN_RIGHT 2
@@ -580,6 +586,23 @@ static void display_actual_time(struct tm *t)
 	}	
 }
 
+//send message to phone app to get battery status of phone
+static void update_phone_battery_status()
+{
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+  if (iter == NULL) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "null iter, can't send");
+  }
+  else
+	{
+  	Tuplet tuple =  TupletInteger(SEND_BATTERY_KEY, 1); 
+    dict_write_tuplet(iter, &tuple);
+    dict_write_end(iter);
+    app_message_outbox_send();
+  }
+}
+
 // Time handler called every minute by the system
 static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
@@ -588,6 +611,7 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
 	display_time(actual_time);	
 	//#endif
+	//update_phone_battery_status();
 }
 
 /**
@@ -1074,6 +1098,9 @@ static void process_key_value(Tuple *tuple)
 		  string_to_array(customRels, 12, tuple->value->cstring);
       //APP_LOG(APP_LOG_LEVEL_DEBUG,"received RELS %s", tuple->value->cstring);
       //APP_LOG(APP_LOG_LEVEL_DEBUG,"length is  %d", strlen(tuple->value->cstring));
+		  break;
+		case BATTERY_LEVEL_KEY:
+		  APP_LOG(APP_LOG_LEVEL_DEBUG,"received Level %d", tuple->value->uint8);
 		  break;	
 	  default:
 	    //store raw c-string 
