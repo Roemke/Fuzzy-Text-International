@@ -159,24 +159,23 @@ Pebble.addEventListener("webviewclosed", webviewclosed);
 //and one for message send from pebble
 //ack is send by pebble js, we don't have to care for it 
 //bad luck, api is not supported, maybe later
+//for next version, experiments with a webservice on android
 Pebble.addEventListener('appmessage',
   function(e) {
       console.log('Received message: '); //ack will be send automatically
       var payload = e.payload;
       if (payload)
       {
+        var foundBat = false;
         if (payload.SEND_BATTERY_KEY)
         {
           console.log("received request for battery status");
-          for (var prop in navigator)
-          {
-            console.log(prop + " with " + navigator[prop]);
-          }
           var bat = navigator.battery || navigator.webkitBattery || navigator.mozBattery; //old style
           if (bat)
           {
             Pebble.sendAppMessage({ 'BATTERY_LEVEL_KEY': parseInt(bat.level*100) });
             console.log("send battery level " + parseInt(bat.level *100));
+            foundBat = true;
           }
           else
           {//ok this is the result, no battery object in sandbox of pebble app :-(
@@ -192,6 +191,37 @@ Pebble.addEventListener('appmessage',
             else 
             {
               console.log("no new style bat object");
+              console.log("try webserver on android device on port 8080");
+              var req = new XMLHttpRequest();
+              req.open('GET', 'http://localhost:8080/get?batterystat=1', true); //true async
+              //ok, that works, but what's about timeout - if I can't connect?
+              //implemented below.
+              //todo: rebuild my nano httpserver to understand the battery command - should deliver json
+              //and start it on start of phone
+              
+              req.onload = function(e) {//onload should always have state 4 ?
+                 if (req.readyState == 4 && req.status == 200) {
+                   clearTimeout(xmlHttpTimeout); 
+                    if(req.status == 200) {
+                       //var response = JSON.parse(req.responseText);
+                       //var temperature = response.list[0].main.temp;
+                       //var icon = response.list[0].main.icon;
+                       console.log(req.responseText);
+                         //Pebble.sendAppMessage({ 'icon':icon, 'temperature':temperature + '\u00B0C'});
+                       } else { console.log('Error'); }
+                    } //status 200 
+                    else
+                    {
+                      console.log("complete, but not ok");
+                    }
+              };//onload
+              req.send(null);
+              // Timeout to abort in 5 seconds, property of XMLHttpRequest seems not to be supported
+              var xmlHttpTimeout=setTimeout( 
+                 function (){
+                   req.abort();
+                   console.log("Request for bat timed out");
+                 },5000);
             }
           }
         }

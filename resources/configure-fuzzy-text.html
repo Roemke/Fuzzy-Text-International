@@ -88,8 +88,10 @@
 		}
 			
 	  //if we have a custom language read the data out of the textarea
-	  if (options.lang == 'cl')
-	  {
+	  //if (options.lang == 'cl')
+	  //{hmm, I should tranfer this data eve if not set to custom 
+	  //otherwise when saving I suppose the app will store empty sets and 
+	  //after that the custom language is set to bavarian again
 	  	console.log("custom language");
 	  	var hours = new Array();
 	  	var hoursS = $('#taHours').val();
@@ -119,7 +121,7 @@
 	  	//because of json.stringify ? or json.parse on other side?
 	  	//no, my mistake - it works
 	  	options.rels  = rels;//.join('|');
-	  } 		
+	  //} 		
 		return options;
 	}
 
@@ -180,6 +182,13 @@
 		}
 		if (opts && opts.warnown) {
 			$form.find('[name="warnown"]').prop('checked', true).checkboxradio('refresh');
+		}
+		//custom language
+		if (opts && opts.hours) {
+			$('#taHours').val(opts.hours.join('\n'));
+		}
+		if (opts && opts.rels) {
+			$('#taRels').val(opts.rels.join('\n'));
 		}
 	}
 //getObject aus get-string fuellen

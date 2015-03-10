@@ -611,7 +611,8 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
 	display_time(actual_time);	
 	//#endif
-	//update_phone_battery_status();
+	// for next version update_phone_battery_status();
+	// will need companion app or webservice on phone, I'll try the web service
 }
 
 /**

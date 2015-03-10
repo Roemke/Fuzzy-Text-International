@@ -15,6 +15,12 @@ watchface. (original comment, I havn't access to an iphone)
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
 
+version 1.4.2 
+-------------
+bug in setting custom language strings
+bug in storing the custom language
+(both in the web-page configure-fuzzy...)
+
 version 1.4.1
 -------------
 found a bug in timetable functionality - strange, it was working sometimes
