@@ -14,6 +14,9 @@ Additions (optional):
   or start of next lesson
 - warns / vibrates 5 minutes before next lesson
 - customize an own language
+- it's possible with an extension (see changes and github)  on android to 
+  watch the battery level of the phone, on ios	I'm not aware 
+  of such an extension 
 
 -----------------------------------------------------
 

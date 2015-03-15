@@ -50,7 +50,7 @@
 	var getObject = {};
 	var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     var dayKeys = [1000,2000,3000,4000,5000,6000,7000];
-	var LATEST = "1.4";
+	var LATEST = "1.5";
 
 	function saveOptions() {
 		var params = {}; //read content of #config as array
@@ -67,6 +67,7 @@
 			lang:		params.lang,
 			delta:  params.delta === 'on',
 			battery: params.battery === 'on',
+			batteryPhone: params.batteryPhone === 'on',
 			done: params.done === 'on',
 			warnown: params.warnown === 'on'
 		};
@@ -176,6 +177,9 @@
 		}
 		if (opts && opts.battery) {
 			$form.find('[name="battery"]').prop('checked', true).checkboxradio('refresh');
+		}
+		if (opts && opts.batteryPhone) {
+			$form.find('[name="batteryPhone"]').prop('checked', true).checkboxradio('refresh');
 		}
 		if (opts && opts.done) {
 			$form.find('[name="done"]').prop('checked', true).checkboxradio('refresh');
@@ -333,7 +337,14 @@ $(document).on('pagecreate','#optionPage', function() {
 						<label>
 							<input type="checkbox" name="battery" value="on" />
 							show line which indicates battery status </label>
+						<label>
+						  show line which indicates battery status of your phone
+							<input type="checkbox" name="batteryPhone" value="on"/></label>
 				</fieldset>
+
+							DO NOT enable battery of phone if you don't have running the special JSON
+							service on your phone. 
+				
 				<div data-role="controlgroup">
 						<label>
 							<input type="checkbox" name="done" value="on" />

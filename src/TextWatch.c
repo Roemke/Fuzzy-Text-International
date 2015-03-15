@@ -28,6 +28,8 @@
 #define HOURS_KEY 7 // hours in custom language
 #define RELS_KEY 8 // rels in custom language
 #define INVERT_KEY 10 
+#define BATTERY_PHONE_KEY 11
+
 #define BATTERY_LEVEL_KEY 20 //
 //-----------------
 //keys which are get on JavaScript side, should be only one
@@ -57,7 +59,9 @@ static bool invert = false;
 static bool delta = false; //kr options static, oh c kann bool dachte waere c++
 	                        //delta is for showing exact - fuzzy
 static bool done = false; //show minutes done and left
-static bool battery = true; //show bar to indicate accu
+static bool battery = true; //show bar to indicate battery
+static bool batteryPhone = false;
+static int  batteryPhoneLevel = -1; //level of phone
 static bool warnown = false;
 static int tt_entries = 0; //how many entries in the TimeTable
 
@@ -245,7 +249,6 @@ static void configureLayer(TextLayer *textlayer,const char * fontKey )
 	text_layer_set_text_color(textlayer, GColorWhite);
 	text_layer_set_background_color(textlayer, GColorClear);
 	text_layer_set_text_alignment(textlayer, lookup_text_alignment(text_align));
-	//APP_LOG(APP_LOG_LEVEL_INFO,"bold layer");
 }
 
 // Configure the layers for the given text
@@ -282,7 +285,6 @@ static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format
 			
       //--------------------
 			GSize size = text_layer_get_content_size(tempLayer);
-			//APP_LOG(APP_LOG_LEVEL_INFO,"height is %i and width %i",size.h,size.w);
 			if (format[i] != 'b' && size.w > MAX_WIDTH_PX) //need to fix the font and the line arrangement
 			{	 //bold lines could be longer (eg sieben in german)
 			   flagWidth = 1; //need to rearrange	
@@ -405,7 +407,6 @@ void handleDeltaToExact(bool delta, int deltaVal)
 	}
 	else // frame ausblenden
 	{
-		//APP_LOG(APP_LOG_LEVEL_INFO,"delta aus");
 		layer_set_hidden((Layer *) deltaLayer,true);
 		//layer_mark_dirty((Layer *) deltaLayer);
 	}	
@@ -415,8 +416,6 @@ void handleDeltaToExact(bool delta, int deltaVal)
 
 void   handleIntervalSettings(struct tm *t, bool done, bool warnown)
 {
-  //APP_LOG(APP_LOG_LEVEL_INFO,"Done is %i warnown is %i weekday %i",done ? 1 : 0, 
-    //                        warnown ? 1 : 0, (t->tm_wday +6 )%7);
 
   if (warnown || done) //otherwise nothing to do 
   {
@@ -431,7 +430,7 @@ void   handleIntervalSettings(struct tm *t, bool done, bool warnown)
       akt= akt->next;
     }
     /*APP_LOG(APP_LOG_LEVEL_INFO,"Done is %i warnown is %i minutes is %i ",done ? 1 : 0, 
-                           warnown ? 1 : 0, minutes);
+                         warnown ? 1 : 0, minutes);
     if (prev)
       APP_LOG(APP_LOG_LEVEL_INFO,"have prev with start %i", prev->startMin );
     if (akt)
@@ -499,7 +498,6 @@ void   handleIntervalSettings(struct tm *t, bool done, bool warnown)
     } //end of done
     else
     {
-      //APP_LOG(APP_LOG_LEVEL_INFO,"set hidden");
       layer_set_hidden((Layer *) doneLayerL,true);
       layer_set_hidden((Layer *) doneLayerR,true);
     }
@@ -535,6 +533,7 @@ static void display_time(struct tm *t)
   //handle interval specific things, maybe changes alignenment of deltaLayer to right
   if (tt_entries > 0) 
     handleIntervalSettings(t,  done,  warnown);
+  
   //if delta we should show delta to exact time
   handleDeltaToExact(delta,deltaVal);
   
@@ -593,6 +592,7 @@ static void update_phone_battery_status()
   app_message_outbox_begin(&iter);
   if (iter == NULL) {
     APP_LOG(APP_LOG_LEVEL_DEBUG, "null iter, can't send");
+    batteryPhoneLevel = -1;
   }
   else
 	{
@@ -608,11 +608,12 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 {
   //#if DEBUG==0 //switch off when using debug
 	actual_time = tick_time;
-	//APP_LOG(APP_LOG_LEVEL_DEBUG, "update time %i", t->tm_min);
 	display_time(actual_time);	
-	//#endif
-	// for next version update_phone_battery_status();
+	
+	if ( batteryPhone && (tick_time->tm_min % 30 == 0 || batteryPhoneLevel == -1 )) //every thirty minutes  
+  	update_phone_battery_status();
 	// will need companion app or webservice on phone, I'll try the web service
+	//#endif
 }
 
 /**
@@ -765,26 +766,32 @@ static TextLayer * prepareTextLayer (Layer * window_layer,
 }
 
 //hmm, called very often, think caused by animation
-//but doesnt matter 
+//but doesnt matter, hmm it matters if asking battery will drain battery
+//I think I read something like this concerning the phones battery but on
+//pebble I found nothing 
 static void batteryDisplayUpdate(Layer * layer, GContext * ctx)
 {
+	int ypos = 5;
+	if (delta || done) //need some place for text
+ 		ypos = 28;
 	if (battery)
 	{
 		BatteryChargeState charge_state = battery_state_service_peek();
 		int width = charge_state.charge_percent/100.0 * 144;
 		graphics_context_set_fill_color(ctx, GColorWhite);
-		if (delta || done) //need some place for text
-  		graphics_fill_rect(ctx, GRect(0, 32, width, 2), 0, GCornerNone);
-    else
-      graphics_fill_rect(ctx, GRect(0, 5, width, 2), 0, GCornerNone);
-          
-		//think refers to layer bounds 
-		//APP_LOG(APP_LOG_LEVEL_INFO,"Done with width %i",width);		
-	}
+    graphics_fill_rect(ctx, GRect(0, ypos, width, 1), 0, GCornerNone);
+  }
+  
+  if (batteryPhone && batteryPhoneLevel != -1)
+  {
+    int width = batteryPhoneLevel/100.0 * 144;
+		graphics_context_set_fill_color(ctx, GColorWhite);
+    graphics_fill_rect(ctx, GRect(0, ypos+3, width, 1), 0, GCornerNone);
+  }      
 }
 static void batteryDisplay()
 {
-	if (battery)
+	if (battery || batteryPhone)
 	{
 		layer_set_hidden(batteryLayer,false);
 		layer_mark_dirty(batteryLayer);    
@@ -797,7 +804,6 @@ static void window_load(Window *window)
 {
 	Layer *window_layer = window_get_root_layer(window);
 	GRect bounds = layer_get_frame(window_layer);
-  //APP_LOG(APP_LOG_LEVEL_INFO, "Window load:  x %i y %i w %i h %i", bounds.origin.x, bounds.origin.y, bounds.size.w, bounds.size.h);
 	//ok, get x 0 y 0 w 144 h 168
 	// Init and load lines
 	for (int i = 0; i < NUM_LINES; i++)
@@ -814,7 +820,7 @@ static void window_load(Window *window)
   doneLayerL = prepareTextLayer (window_layer, doneLayerTextL,GTextAlignmentLeft, 0,0,144,28);  
   doneLayerR = prepareTextLayer (window_layer, doneLayerTextR,GTextAlignmentRight,94,0,50,28);  
 
-  batteryLayer = layer_create(GRect(0,3,144,34)); //von 35 bis 36
+  batteryLayer = layer_create(GRect(0,5,144,34)); //von 35 bis 36
   layer_set_update_proc(batteryLayer, batteryDisplayUpdate);
   layer_add_child(window_layer,batteryLayer);
   batteryDisplay();
@@ -863,17 +869,14 @@ static int getTimeData(char * tupleString, int *sh, int *sm, int *eh, int *em, b
 {
    char * tempBuf = (char *) malloc(strlen(tupleString)+1);
    strcpy(tempBuf,tupleString); // copy is safer, don't know if I can modify tuple->value			    
-  // APP_LOG(APP_LOG_LEVEL_DEBUG,"part is  %s len is %i ", tempBuf , strlen(tupleString));
    *sh=*sm=*eh=*em=0;
    *own = false;
    char * sep = strchr(tempBuf, '|'); //first |   18:30|20:20|1
    int res = 1; //error
    if (sep != 0)
    {
-     //APP_LOG(APP_LOG_LEVEL_DEBUG,"part is  %s", sep+1);
      
      char * sep2 = strchr(sep+1, '|'); //second |        0     0
-     //APP_LOG(APP_LOG_LEVEL_DEBUG,"part is  %s", sep2);
      *sep  = 0;
      *sep2 = 0;
      char * colon = strchr(tempBuf,':'); //first :    0     0  
@@ -886,8 +889,6 @@ static int getTimeData(char * tupleString, int *sh, int *sm, int *eh, int *em, b
      *em = atoi(colon2+1);       //           20
      *own   = (*(sep2+1) == '1') ;        //              1
      //hmm should work  
-     //APP_LOG(APP_LOG_LEVEL_DEBUG,"stime  is %i:%i end  is %i:%i own is %i", *sh,*sm,*eh,*em,*own);  
-     //APP_LOG(APP_LOG_LEVEL_DEBUG,"string is %s parts %s %s %s %s", tupleString, sep+1, colon+1, sep2+1, colon2+1 );  
      res = 0; //success
    }
    free (tempBuf);
@@ -915,7 +916,6 @@ static void freeTT()
     TTEntry *next = ttPerDay[i];
     ttPerDay[i] = 0;
     TTEntry *akt = next;
-    APP_LOG(APP_LOG_LEVEL_DEBUG,"Free day %i ",i);
  
     while(akt)
     {
@@ -925,20 +925,6 @@ static void freeTT()
     }
   }
 }
-/* schleife dauert ewig, das bringt es nicht
-static void usedMemory()
-{
-  int totalSize = 0;
-  // Adjust the value (in this example: 2000) to your maximum key that you know you're using in your app
-  for (int i = 0; i < 8000; i++) {
-    if (persist_exists(i)) {
-      int size = persist_get_size(i);
-      totalSize = totalSize + size;
-    }
-  }
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "Persistent storage used = %d", totalSize); 
-}
-*/
 static void logTT(const char * fromWhere)
 {
   APP_LOG(APP_LOG_LEVEL_DEBUG," List of TimeTable Entries we are called from %s",fromWhere);
@@ -974,24 +960,36 @@ void put_to_list(int key, int sh, int sm, int eh, int em, bool own)
   while (  aktTT && aktTT->next && position > aktTT->position) //position suchen
   {
     prev = aktTT;
-    //APP_LOG(APP_LOG_LEVEL_DEBUG,"found number %i" , counter++);
     aktTT = aktTT->next;
     
   }
-  //habe :0 -> erstes Element / aktTT->next == 0 -> muss als letztes Element gesetzt werde / einbauen
-  if (!aktTT || (!prev && position <= aktTT->position)  ) //erstes
-  {
-    ttPerDay[dayIndex] = tt;
-    tt->next = aktTT;			    
-  }
-  else if (!aktTT->next && position > aktTT->position) //letztes
-    aktTT->next = tt;
-  else //einbauen
-  { 
-    //APP_LOG(APP_LOG_LEVEL_DEBUG,"einbauen");
-    tt->next = aktTT;
-    prev->next = tt;
-  } //jetzt sollte eingehaengt sein 
+  //problem: in the versions up to 1.4 I can delete the list before I come here
+  //now since 1.5 it isn't possible 
+  //position == aktTT->position || position < aktTT->position, if == the entry could exist
+  //ok, but does not solve the problem cause now I can't delete an enry
+  //I must detect if we have configuration from setting and in this case delete the list of timetable entries 
+ // if (aktTT && aktTT->position == tt->position 
+ //           && aktTT->startMin == tt->startMin 
+ //           && aktTT->endMin   == tt->endMin
+ //           && aktTT->own      == tt->own)
+ // {
+ // }
+ // else
+ // {   
+    //habe :0 -> erstes Element / aktTT->next == 0 -> muss als letztes Element gesetzt werde / einbauen
+    if (!aktTT || (!prev && position <= aktTT->position)  ) //erstes
+    {
+      ttPerDay[dayIndex] = tt;
+      tt->next = aktTT;			    
+    }
+    else if (!aktTT->next && position > aktTT->position) //letztes
+      aktTT->next = tt;
+    else //einbauen
+    { 
+      tt->next = aktTT;
+      prev->next = tt;
+    } //jetzt sollte eingehaengt sein
+ // } 
 }          
 
 //log array content 
@@ -1031,7 +1029,7 @@ void string_to_array(char ** arrOfC, int n, char *string)
      free(arrOfC[i]);
    arrOfC[i] = (char * ) calloc(size+1, sizeof(char));
    strcpy(arrOfC[i++],prev); 
-   log_array(arrOfC,i);
+   //log_array(arrOfC,i);
 }
 
 
@@ -1078,6 +1076,10 @@ static void process_key_value(Tuple *tuple)
 			battery = tuple->value->uint8 == 1;
 			persist_write_bool(BATTERY_KEY, battery); //persistent
 			break;
+		case BATTERY_PHONE_KEY:
+			batteryPhone = tuple->value->uint8 == 1;
+			persist_write_bool(BATTERY_PHONE_KEY, batteryPhone); //persistent
+			break;
 		case WARNOWN_KEY:
 			warnown = tuple->value->uint8 == 1;
 			persist_write_bool(WARNOWN_KEY, warnown); //persistent
@@ -1089,6 +1091,8 @@ static void process_key_value(Tuple *tuple)
 		case TIMETABLE_KEY:
 			tt_entries = tuple->value->uint32;
 			persist_write_int(TIMETABLE_KEY, tt_entries); //persistent
+			if (!tt_entries)
+			  freeTT(); //free it 
 			break;
 		case HOURS_KEY: //long string of hours, separated by |
 		  persist_write_string(HOURS_KEY, tuple->value->cstring);		  
@@ -1097,18 +1101,13 @@ static void process_key_value(Tuple *tuple)
 		case RELS_KEY:
 		  persist_write_string(RELS_KEY, tuple->value->cstring);
 		  string_to_array(customRels, 12, tuple->value->cstring);
-      //APP_LOG(APP_LOG_LEVEL_DEBUG,"received RELS %s", tuple->value->cstring);
-      //APP_LOG(APP_LOG_LEVEL_DEBUG,"length is  %d", strlen(tuple->value->cstring));
 		  break;
 		case BATTERY_LEVEL_KEY:
-		  APP_LOG(APP_LOG_LEVEL_DEBUG,"received Level %d", tuple->value->uint8);
+		  batteryPhoneLevel = tuple->value->uint8;
 		  break;	
 	  default:
 	    //store raw c-string 
-			// must be TTEntry , hmm should we write to persistent storage on watch?
-			//maybe later, otherwise it is not possible to use timetable without connection to 
-			//phone. if we had the connection the watch will get the data from the pebble app part of
-			//this program
+			// must be TTEntry ,
 			// get var dayKeys = [1000,2000,3000,4000,5000,6000,7000]
 			if ((unsigned int)key >= 1000)
 			{
@@ -1117,7 +1116,7 @@ static void process_key_value(Tuple *tuple)
         bool own;
         if (! getTimeData((char *) tuple->value->cstring, &sh, &sm, &eh, &em, &own)) // returns 0 for success
         {
-        //APP_LOG(APP_LOG_LEVEL_DEBUG,"sh %i sm %i eh %i em %i own %i ", sh, sm, eh,em, own );
+        //APP_LO G(APP_LOG_LEVEL_DEBUG,"sh %i sm %i eh %i em %i own %i ", sh, sm, eh,em, own );
           put_to_list(key, sh, sm, eh, em, own);
         }
 			}
@@ -1128,18 +1127,27 @@ static void process_key_value(Tuple *tuple)
 	}
 	if (actual_time)
 	{
-		display_time(actual_time);
+	  handle_minute_tick(actual_time,MINUTE_UNIT);
+		//display_time(actual_time);
 	}
 }
 //event-handlers
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
   //callback can only mean that we receive our settings
   //logTT("inbox_received_callback");
-  freeTT();
-  
-  // Get the first pair
-  Tuple *t = dict_read_first(iterator);
-
+  //freeTT(); was okay when only receiving configuration, but now we receive information
+  //of phone battery  status and then we can't delete the timeTable here 
+  //hmm, need to destroy timetable list if the received data results from configuration
+  // can check this by find in dictionary, 
+  Tuple *t = dict_find(iterator,BATTERY_LEVEL_KEY);
+  if (! t)
+  {
+     freeTT(); //should it be, hmm 
+     APP_LOG(APP_LOG_LEVEL_DEBUG,"caused by save fromm pebble app"); 
+  }
+  else 
+     APP_LOG(APP_LOG_LEVEL_DEBUG,"found battery phone key"); 
+  t = dict_read_first(iterator);
   // Process all pairs present
   while (t != NULL) {
     // Long lived buffer
@@ -1158,6 +1166,8 @@ static void inbox_dropped_callback(AppMessageResult reason, void *context) {
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+  //in the moment it can be only the battery request 
+  batteryPhoneLevel = -1;
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
@@ -1226,7 +1236,8 @@ static void handle_init() {
     #define DONE_KEY 4  //show minutes done   
     #define BATTERY_KEY 5 // battery bar 
     #define WARNOWN_KEY 6 // warning / vibration 5 minutes before own lessen 
-    #define INVERT_KEY 10 
+    #define INVERT_KEY 10
+    #define BATTERY_PHONE_KEY 11  
   */
 	if (persist_exists(TIMETABLE_KEY))
 	{ 
@@ -1255,6 +1266,10 @@ static void handle_init() {
 	if (persist_exists(BATTERY_KEY))
 	{
 		battery =  persist_read_bool(BATTERY_KEY);
+	}
+	if (persist_exists(BATTERY_PHONE_KEY))
+	{
+		batteryPhone =  persist_read_bool(BATTERY_PHONE_KEY);
 	}
 	if (persist_exists(WARNOWN_KEY))
 	{

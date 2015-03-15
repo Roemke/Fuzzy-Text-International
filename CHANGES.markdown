@@ -4,7 +4,7 @@
 Changes
 ========
 
-The latest version is 1.4  To update, remove the watchface from your
+The latest version is 1.5  To update, remove the watchface from your
 watch and then load it again from your locker.
 
 The iOS version has to go through the Apple Store approval process - so
@@ -14,6 +14,21 @@ watchface. (original comment, I havn't access to an iphone)
 
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
+
+version 1.5
+-------------
+On Android it is possible to show the battery level of the phone as second
+bar. You need a service running on android.
+The apk and the sourcecode you will find on github.
+[AndroidServerJSON auf github](https://github.com/Roemke/AndroidServerJSON)
+
+In the moment I check every minute if I have no information about 
+phone battery level and check every 30 Minutes if I have the information
+so the battery bar.
+
+So don't enable this,  if you don't have a service running on your phone
+which delivers the battery status cause you will send every minute a 
+bluetoothquestion to your phone 
 
 version 1.4.2 
 -------------
