@@ -68,6 +68,7 @@
 			delta:  params.delta === 'on',
 			battery: params.battery === 'on',
 			batteryPhone: params.batteryPhone === 'on',
+			shakeDetect: params.shakeDetect === 'on',
 			done: params.done === 'on',
 			warnown: params.warnown === 'on'
 		};
@@ -180,6 +181,9 @@
 		}
 		if (opts && opts.batteryPhone) {
 			$form.find('[name="batteryPhone"]').prop('checked', true).checkboxradio('refresh');
+		}
+		if (opts && opts.shakeDetect) {
+			$form.find('[name="shakeDetect"]').prop('checked', true).checkboxradio('refresh');
 		}
 		if (opts && opts.done) {
 			$form.find('[name="done"]').prop('checked', true).checkboxradio('refresh');
@@ -340,6 +344,9 @@ $(document).on('pagecreate','#optionPage', function() {
 						<label>
 						  show line which indicates battery status of your phone
 							<input type="checkbox" name="batteryPhone" value="on"/></label>
+						<label>
+						  enable DataMode if shaking your wrist
+							<input type="checkbox" name="shakeDetect" value="on"/></label>
 				</fieldset>
 
 							DO NOT enable battery of phone if you don't have running the special JSON

@@ -12,8 +12,8 @@
 //problem 
 
 #define NUM_LINES 4
-#define LINE_LENGTH 7
-#define BUFFER_SIZE (LINE_LENGTH + 2)
+#define LINE_LENGTH 7 //
+#define BUFFER_SIZE (LINE_LENGTH + 10) //for smaller font we need more characters
 #define ROW_HEIGHT 37 //was 37
 #define ROW_HEIGHT_SMALL 30 //kr
 
@@ -29,6 +29,7 @@
 #define RELS_KEY 8 // rels in custom language
 #define INVERT_KEY 10 
 #define BATTERY_PHONE_KEY 11
+#define SHAKE_KEY 12 //if shake your wrist datamode is enabled
 
 #define BATTERY_LEVEL_KEY 20 //
 //-----------------
@@ -60,10 +61,14 @@ static bool delta = false; //kr options static, oh c kann bool dachte waere c++
 	                        //delta is for showing exact - fuzzy
 static bool done = false; //show minutes done and left
 static bool battery = true; //show bar to indicate battery
+static int batteryLevel = -1;
 static bool batteryPhone = false;
 static int  batteryPhoneLevel = -1; //level of phone
+static bool shakeDetect = false; //detect shaking of wrist to enable datamode
 static bool warnown = false;
 static int tt_entries = 0; //how many entries in the TimeTable
+
+static bool dataMode = false; //false; //show date time and additional info instead of fuzzy-time
 
 char * customHours[24]={0}; //if we have custom hours, use this 
 char * customRels[12]={0}; //should be complete 0 
@@ -253,6 +258,10 @@ static void configureLayer(TextLayer *textlayer,const char * fontKey )
 
 // Configure the layers for the given text
 //returns number of lines we need
+/* special cases
+  font is two wide 
+  we have 4 lines but need room at the top
+*/
 static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format[])
 {
 	int numLines = 0;
@@ -264,7 +273,7 @@ static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format
   //TextLayer * tempLayer  = text_layer_create(GRect(144, 0, 144, 50)); besser in window_load evtl. performance
 
 
-	for (i = 0; i < NUM_LINES; i++) {
+	for (i = 0; i < NUM_LINES; i++) { //normal case
 		if (strlen(text[i]) > 0) {
 			if (format[i] == 'b')
 			{
@@ -298,8 +307,8 @@ static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format
 		}	
 	}
 	int yPositions[]={10,47,84,121};
-	if (flagWidth ) // problems with width of font	
-	{ //one try with smaller font could be later extende to do while and font list 
+	if (flagWidth ) // problems with width of font - to wide	
+	{ //one try with smaller font could be later extende to do while and font list, no, limited fonts 
 		for (i = 0; i < NUM_LINES; i++) //looks ok
 		{
 			if (strlen(text[i]) > 0) {
@@ -321,13 +330,25 @@ static int configureLayersForText(char text[NUM_LINES][BUFFER_SIZE], char format
 	}
 	// Calculate y position of top Line
 	numLines = i;
-	if (numLines == 4 && (delta || done)) //obersten zwei Zeilen kleiner
+	if (numLines == 4 && (delta || done)) //top-lines smaller, we need some room at the top
 	{
 		yPositions[0] = 36;
 		yPositions[1] = 60;
 		configureLayer(lines[0].nextLayer,FONT_KEY_GOTHIC_28);
 		configureLayer(lines[1].nextLayer,FONT_KEY_GOTHIC_28);
 	}
+	if (dataMode) //we have 3 lines with percent phone percent pebble battery, date, time 
+	{ //3 lines 
+	  numLines = 3;
+	  
+	  yPositions[1] = 40;
+	  yPositions[2] = 75;
+	  yPositions[3] = 110;
+	  configureLayer(lines[0].nextLayer,FONT_KEY_GOTHIC_28_BOLD);
+	  configureLayer(lines[1].nextLayer,FONT_KEY_GOTHIC_28_BOLD);
+	  configureLayer(lines[2].nextLayer,FONT_KEY_ROBOTO_BOLD_SUBSET_49);//_BITHAM_42_BOLD);
+	}
+
 	// Set y positions for the lines
 	for (int i = 0; i < numLines; i++)
 	{
@@ -390,13 +411,36 @@ static int time_to_lines(int hours, int minutes, int seconds, char lines[NUM_LIN
 	return deltaVal;
 }
 
+//data-mode: numbers 
+static void time_to_lines_DataMode(struct tm * t, char lines[NUM_LINES][BUFFER_SIZE])
+{
+	for (int i = 0; i < NUM_LINES; i++)
+	{
+		lines[i][0] = '\0';
+	}
+	
+	if (batteryPhoneLevel != -1 && batteryLevel != -1)
+  	snprintf(lines[0],12,"%d%% / %d%%",batteryPhoneLevel, batteryLevel);
+  else if (batteryPhoneLevel == -1 && batteryLevel != -1)
+  	snprintf(lines[0],12,"-- / %d%%", batteryLevel);
+  else if (batteryPhoneLevel != -1 && batteryLevel == -1)
+  	snprintf(lines[0],12,"%d%% / --", batteryPhoneLevel);
+  else  
+  	snprintf(lines[0],12,"-- / --"); //should not/rarely occur
+	
+	snprintf(lines[1],11,"%02d.%02d.%4d",t->tm_mday, t->tm_mon+1, t->tm_year + 1900);
+	snprintf(lines[2],6,"%02d:%02d",t->tm_hour, t->tm_min);
+}
+
 
 //if delta is own we schould show the difference from exact time
 void handleDeltaToExact(bool delta, int deltaVal)
 {
 	if (delta )
 	{
-		if (deltaVal==0)
+		if (dataMode)
+		  snprintf(deltaLayerText,5," ");
+		else if (deltaVal==0)
 			snprintf(deltaLayerText,5," * ");
 		else if (deltaVal < 0)
 			snprintf(deltaLayerText,5,"(%i)",deltaVal);
@@ -525,8 +569,11 @@ static void display_time(struct tm *t)
 	char format[NUM_LINES];
 
 	//(kr) delta is realTime - roundedTime (rounded: 5 minutes interval)
-	int deltaVal = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
-  
+	int deltaVal = 0;
+	if (!dataMode)
+	  deltaVal = time_to_lines(t->tm_hour, t->tm_min, t->tm_sec, textLine, format);
+  else
+    time_to_lines_DataMode(t, textLine);
   
   text_layer_set_text_alignment (deltaLayer, GTextAlignmentCenter);
   
@@ -610,9 +657,23 @@ static void handle_minute_tick(struct tm *tick_time, TimeUnits units_changed)
 	actual_time = tick_time;
 	display_time(actual_time);	
 	
+	bool redrawBattery = false;
+	
 	if ( batteryPhone && (tick_time->tm_min % 30 == 0 || batteryPhoneLevel == -1 )) //every thirty minutes  
-  	update_phone_battery_status();
+  {
+  	update_phone_battery_status();	
+  	redrawBattery = true;
+	}
 	// will need companion app or webservice on phone, I'll try the web service
+	
+  if ((battery || dataMode) && (tick_time->tm_min % 10 == 0 || batteryLevel == -1 )) //not to expensive I think, do it more often
+  {  
+    BatteryChargeState charge_state = battery_state_service_peek();
+    batteryLevel =  charge_state.charge_percent;
+    redrawBattery = battery ; //only draw if battery is set
+  }
+  if (redrawBattery)
+    layer_mark_dirty(batteryLayer);
 	//#endif
 }
 
@@ -768,16 +829,17 @@ static TextLayer * prepareTextLayer (Layer * window_layer,
 //hmm, called very often, think caused by animation
 //but doesnt matter, hmm it matters if asking battery will drain battery
 //I think I read something like this concerning the phones battery but on
-//pebble I found nothing 
+//pebble I found nothing, hhmm not really sure when it's called, I 
+//think I have an overlap, but I need to trigger this in handle_minute
 static void batteryDisplayUpdate(Layer * layer, GContext * ctx)
 {
+  //APP _LOG(APP_LOG_LEVEL_DEBUG,"call to batteryDisplay");
 	int ypos = 5;
 	if (delta || done) //need some place for text
  		ypos = 28;
-	if (battery)
+	if (battery && batteryLevel != -1)
 	{
-		BatteryChargeState charge_state = battery_state_service_peek();
-		int width = charge_state.charge_percent/100.0 * 144;
+		int width = batteryLevel /100.0 * 144;		
 		graphics_context_set_fill_color(ctx, GColorWhite);
     graphics_fill_rect(ctx, GRect(0, ypos, width, 1), 0, GCornerNone);
   }
@@ -1032,6 +1094,13 @@ void string_to_array(char ** arrOfC, int n, char *string)
    //log_array(arrOfC,i);
 }
 
+//tap should switch to data mode - only numbers
+static void tap_handler(AccelAxisType axis, int32_t direction) {
+  dataMode = !dataMode;    
+  if (actual_time)
+    handle_minute_tick(actual_time,MINUTE_UNIT);
+}
+
 
 
 //tuple belongs to an iterator, and it is possible that the
@@ -1059,7 +1128,6 @@ static void process_key_value(Tuple *tuple)
 		case INVERT_KEY:
 			invert = tuple->value->uint8 == 1;
 			persist_write_bool(INVERT_KEY, invert);
-
 			layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
 			layer_mark_dirty(inverter_layer_get_layer(inverter_layer));
 			break;
@@ -1102,7 +1170,17 @@ static void process_key_value(Tuple *tuple)
 		  persist_write_string(RELS_KEY, tuple->value->cstring);
 		  string_to_array(customRels, 12, tuple->value->cstring);
 		  break;
-		case BATTERY_LEVEL_KEY:
+    case SHAKE_KEY: 
+			if (shakeDetect)
+  			accel_tap_service_unsubscribe();
+      shakeDetect = tuple->value->uint8 == 1;
+			persist_write_bool(SHAKE_KEY, shakeDetect); //persistent
+			if (shakeDetect)
+        accel_tap_service_subscribe(tap_handler);
+			else
+			  dataMode = false; //false however it was before
+			break;
+		case BATTERY_LEVEL_KEY: 
 		  batteryPhoneLevel = tuple->value->uint8;
 		  break;	
 	  default:
@@ -1143,7 +1221,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   if (! t)
   {
      freeTT(); //should it be, hmm 
-     APP_LOG(APP_LOG_LEVEL_DEBUG,"caused by save fromm pebble app"); 
+     APP_LOG(APP_LOG_LEVEL_DEBUG,"caused by save from pebble app"); 
   }
   else 
      APP_LOG(APP_LOG_LEVEL_DEBUG,"found battery phone key"); 
@@ -1197,34 +1275,6 @@ static void handle_message_init()
    app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
                                        
 }
-//tap should switch weekend mode
-static void tap_handler(AccelAxisType axis, int32_t direction) {
-  static bool first = true;
-  if (tt_entries > 0)
-  {
-    if (first)
-    {
-      if (done || warnown) //one is set - unset them all
-        done = warnown = false;
-      else 
-        done = warnown = true; 
-    }
-    else //change status
-    {
-      done = !done;
-      warnown = ! warnown;
-    }
-    first = ! first;
-    if (!done)
-    {
-      layer_set_hidden((Layer *) doneLayerL,true);
-      layer_set_hidden((Layer *) doneLayerR,true);
-    }
-    if (actual_time)
-      display_time(actual_time);
-  } 
-}
-
         
 static void handle_init() {
 	// Load settings from persistent storage
@@ -1274,6 +1324,10 @@ static void handle_init() {
 	if (persist_exists(WARNOWN_KEY))
 	{
 		warnown =  persist_read_bool(WARNOWN_KEY);
+	}
+	if (persist_exists(SHAKE_KEY))
+	{
+		shakeDetect =  persist_read_bool(SHAKE_KEY);
 	}
 	
 	if (persist_exists(HOURS_KEY))
@@ -1331,7 +1385,8 @@ static void handle_init() {
   window_set_fullscreen(window, true); 
 
   //subscribe tap_handler
-  accel_tap_service_subscribe(tap_handler);
+  if (shakeDetect)
+    accel_tap_service_subscribe(tap_handler);
   //message gedoens
   handle_message_init();	
 
@@ -1349,7 +1404,8 @@ static void handle_init() {
 static void handle_deinit()
 {
   
-  accel_tap_service_unsubscribe(); //not sure if necessary, but in complete example they use unsubscribe
+  if (shakeDetect)
+    accel_tap_service_unsubscribe(); //not sure if necessary, but in complete example they use unsubscribe
 	freeTT(); //list
 	freeArray(customHours,24); //array with custom Hours
 	freeArray(customRels,12);
@@ -1360,7 +1416,6 @@ static void handle_deinit()
 int main(void)
 {
 	handle_init();
-	
 	app_event_loop();
 	handle_deinit();
 }

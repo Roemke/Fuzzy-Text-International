@@ -15,6 +15,19 @@ watchface. (original comment, I havn't access to an iphone)
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
 
+version 1.6
+------------
+Changed behaviour of shaking your wrist.
+Instead of switching on or off the information according to the time table
+I show an different layout with the following information
+timetable things (if set)
+bar for battery  (if set)
+bar for phone battery (if set)
+text percent for  phone battery / battery
+Date 
+Time not fuzzy but exact
+shaking wrist can be switched off in configuration
+
 version 1.5
 -------------
 On Android it is possible to show the battery level of the phone as second

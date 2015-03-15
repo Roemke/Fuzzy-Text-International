@@ -1,4 +1,4 @@
-var VERSION = "1.5";
+var VERSION = "1.6";
 
 var isReady = false;
 var callbacks = []; //stack for callbacks
@@ -110,7 +110,8 @@ function prepareConfiguration(serialized_settings) {
     "6": settings.warnown  ? 1 : 0,
     "7": settings.hours ? settings.hours.join('|') : '',
     "8": settings.rels ? settings.rels.join('|') : '',
-    "11": settings.batteryPhone ? 1 : 0
+    "11": settings.batteryPhone ? 1 : 0,
+    "12": settings.shakeDetect ? 1 : 0
   };
   //need to append time-table to result, no can't handle that
   var dataCounter = 0; 
