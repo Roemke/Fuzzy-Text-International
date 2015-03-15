@@ -1,4 +1,4 @@
-var VERSION = "1.4";
+var VERSION = "1.5";
 
 var isReady = false;
 var callbacks = []; //stack for callbacks
@@ -109,7 +109,8 @@ function prepareConfiguration(serialized_settings) {
     "5": settings.battery ? 1 : 0, 
     "6": settings.warnown  ? 1 : 0,
     "7": settings.hours ? settings.hours.join('|') : '',
-    "8": settings.rels ? settings.rels.join('|') : ''
+    "8": settings.rels ? settings.rels.join('|') : '',
+    "11": settings.batteryPhone ? 1 : 0
   };
   //need to append time-table to result, no can't handle that
   var dataCounter = 0; 
@@ -119,7 +120,7 @@ function prepareConfiguration(serialized_settings) {
   		{
   			dataCounter++;
   			result[prop]= settings[prop]; //transfer it to result 
-  		} //all strings wich are submitted to the c-Programm (timetable
+  		} //all strings wich are submitted to the c-Programm (timetable)
   }
   //console.log("dataCounter is: " + dataCounter);
   result["0"] = dataCounter; //send back how many entries I have in the timetable 
@@ -184,30 +185,30 @@ Pebble.addEventListener('appmessage',
             {
               navigator.getBattery().then(
                   function(bat)
-                        {
-                          console.log("found new style bat object");
-                        });
-            }
+                  {
+                     console.log("found new style bat object");
+                  }); //need to code this, if pebbles sandbox sometimes support it
+            } //hhm restructure it to use if - else if - else
             else 
             {
               console.log("no new style bat object");
               console.log("try webserver on android device on port 8080");
               var req = new XMLHttpRequest();
-              req.open('GET', 'http://localhost:8080/get?batterystat=1', true); //true async
+              req.open('GET', 'http://localhost:8080/getJSON', true); //true async
               //ok, that works, but what's about timeout - if I can't connect?
               //implemented below.
               //todo: rebuild my nano httpserver to understand the battery command - should deliver json
-              //and start it on start of phone
+              //and start it on start of phone, done
               
               req.onload = function(e) {//onload should always have state 4 ?
                  if (req.readyState == 4 && req.status == 200) {
                    clearTimeout(xmlHttpTimeout); 
                     if(req.status == 200) {
-                       //var response = JSON.parse(req.responseText);
-                       //var temperature = response.list[0].main.temp;
-                       //var icon = response.list[0].main.icon;
-                       console.log(req.responseText);
-                         //Pebble.sendAppMessage({ 'icon':icon, 'temperature':temperature + '\u00B0C'});
+                       var response = JSON.parse(req.responseText);
+                       console.log("It seems we have success");
+                       console.log("Charging: " + response.batteryIsCharging);
+                       console.log("Level: " + response.batteryLevel);
+                       Pebble.sendAppMessage({ 'BATTERY_LEVEL_KEY': parseInt(response.batteryLevel) });
                        } else { console.log('Error'); }
                     } //status 200 
                     else
@@ -222,11 +223,11 @@ Pebble.addEventListener('appmessage',
                    req.abort();
                    console.log("Request for bat timed out");
                  },5000);
-            }
-          }
-        }
-      }
-  }
+            } //eof connect to android service  on localhost 8080
+          } //eof try new battery manger or service on localhost 
+        } //eof payload is battery request 
+      }//eof if payload
+  } //eof event listener
 );
         
 
