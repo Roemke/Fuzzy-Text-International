@@ -100,8 +100,9 @@ typedef struct TTEntry
 static TTEntry * ttPerDay[]={0,0,0,0,0,0,0}; //7 Listen fuer die Tage
 
 static Line lines[NUM_LINES];
+#ifdef PBL_BW 
 static InverterLayer *inverter_layer;
-
+#endif
 static TextLayer * tempLayer ; // = text_layer_create(GRect(144, 0, 144, 50));
 char tempLayerText[BUFFER_SIZE];
 
@@ -159,6 +160,8 @@ static void makeAnimationsForLayer(Line *line, int delay)
 	TextLayer *next = line->nextLayer;
 
 	// Destroy old animations
+	//no need if we are on a color-pebble
+	#ifdef PBL_BW
 	if (line->animation1 != NULL)
 	{
 		 property_animation_destroy(line->animation1);
@@ -167,31 +170,31 @@ static void makeAnimationsForLayer(Line *line, int delay)
 	{
 		 property_animation_destroy(line->animation2);
 	}
-
+  #endif
 	// Configure animation for current layer to move out
 	GRect rect = layer_get_frame((Layer *)current);
 	rect.origin.x =  -144;
 	line->animation1 = property_animation_create_layer_frame((Layer *)current, NULL, &rect);
-	animation_set_duration(&line->animation1->animation, ANIMATION_DURATION);
-	animation_set_delay(&line->animation1->animation, delay);
-	animation_set_curve(&line->animation1->animation, AnimationCurveEaseIn); // Accelerate
+	animation_set_duration(property_animation_get_animation(line->animation1), ANIMATION_DURATION);
+	animation_set_delay(property_animation_get_animation(line->animation1), delay);
+	animation_set_curve(property_animation_get_animation(line->animation1), AnimationCurveEaseIn); // Accelerate
 
 	// Configure animation for current layer to move in
 	GRect rect2 = layer_get_frame((Layer *)next);
 	rect2.origin.x = 0; //looks correct but string with width 142 does not fit into layer
 	line->animation2 = property_animation_create_layer_frame((Layer *)next, NULL, &rect2);
-	animation_set_duration(&line->animation2->animation, ANIMATION_DURATION);
-	animation_set_delay(&line->animation2->animation, delay + ANIMATION_OUT_IN_DELAY);
-	animation_set_curve(&line->animation2->animation, AnimationCurveEaseOut); // Deaccelerate
+	animation_set_duration(property_animation_get_animation(line->animation2), ANIMATION_DURATION);
+	animation_set_delay(property_animation_get_animation(line->animation2), delay + ANIMATION_OUT_IN_DELAY);
+	animation_set_curve(property_animation_get_animation(line->animation2), AnimationCurveEaseOut); // Deaccelerate
 
 	// Set a handler to rearrange layers after animation is finished
-	animation_set_handlers(&line->animation2->animation, (AnimationHandlers) {
+	animation_set_handlers(property_animation_get_animation(line->animation2), (AnimationHandlers) {
 		.stopped = (AnimationStoppedHandler)animationStoppedHandler
 	}, current);
 
 	// Start the animations
-	animation_schedule(&line->animation1->animation);
-	animation_schedule(&line->animation2->animation);	
+	animation_schedule(property_animation_get_animation(line->animation1));
+	animation_schedule(property_animation_get_animation(line->animation2));	
 }
 
 static void updateLayerText(TextLayer* layer, char* text)
@@ -615,6 +618,8 @@ static void initLineForStart(Line* line)
 static void display_actual_time(struct tm *t)
 {
 	// The current time text will be stored in the following strings
+  //APP_LOG(APP_LOG_LEVEL_INFO, "call to display_actual_time with %p",t);
+
 	char textLine[NUM_LINES][BUFFER_SIZE];
 	char format[NUM_LINES];
 
@@ -862,53 +867,6 @@ static void batteryDisplay()
 		layer_set_hidden(batteryLayer,true);    
 }
 
-static void window_load(Window *window)
-{
-	Layer *window_layer = window_get_root_layer(window);
-	GRect bounds = layer_get_frame(window_layer);
-	//ok, get x 0 y 0 w 144 h 168
-	// Init and load lines
-	for (int i = 0; i < NUM_LINES; i++)
-	{
-		init_line(&lines[i]);
-		layer_add_child(window_layer, (Layer *)lines[i].currentLayer);
-		layer_add_child(window_layer, (Layer *)lines[i].nextLayer);
-	}
-	tempLayer = text_layer_create(GRect(144, 0, 144, 50));//besser hier, performance?
-	text_layer_set_text(tempLayer,tempLayerText); //sonst hat er keinen speicher
-	layer_add_child(window_layer, (Layer *)tempLayer);
-
-  deltaLayer = prepareTextLayer (window_layer, deltaLayerText, GTextAlignmentCenter, 0,0,144,28);//x,y,w,h
-  doneLayerL = prepareTextLayer (window_layer, doneLayerTextL,GTextAlignmentLeft, 0,0,144,28);  
-  doneLayerR = prepareTextLayer (window_layer, doneLayerTextR,GTextAlignmentRight,94,0,50,28);  
-
-  batteryLayer = layer_create(GRect(0,5,144,34)); //von 35 bis 36
-  layer_set_update_proc(batteryLayer, batteryDisplayUpdate);
-  layer_add_child(window_layer,batteryLayer);
-  batteryDisplay();
-
-	inverter_layer = inverter_layer_create(bounds);
-	layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
-	layer_add_child(window_layer, inverter_layer_get_layer(inverter_layer));
-
-	// Configure time on init
-	time_t raw_time;
-	time(&raw_time);
-	actual_time = localtime(&raw_time); //where is memory handled
-	display_actual_time(actual_time);	
-
-}
-
-static void window_unload(Window *window)
-{
-	// Free layers
-	inverter_layer_destroy(inverter_layer);
-  text_layer_destroy(tempLayer);
-	for (int i = 0; i < NUM_LINES; i++)
-	{
-		destroy_line(&lines[i]);
-	}
-}
 
 /* hmm, strchr exists is not documented 
 static char * mystrchr (char * hs, char n)
@@ -1096,7 +1054,13 @@ void string_to_array(char ** arrOfC, int n, char *string)
 
 //tap should switch to data mode - only numbers
 static void tap_handler(AccelAxisType axis, int32_t direction) {
-  dataMode = !dataMode;    
+  dataMode = !dataMode;
+  //have problems when using pebble time, actual_time is not given?
+  //on old pebble no such problems - maybe the reason is located in starting the app?
+	time_t raw_time;
+	time(&raw_time);
+	actual_time = localtime(&raw_time); //where is memory handled
+      
   if (actual_time)
     handle_minute_tick(actual_time,MINUTE_UNIT);
 }
@@ -1125,12 +1089,14 @@ static void process_key_value(Tuple *tuple)
 				layer_mark_dirty(text_layer_get_layer(lines[i].nextLayer));
 			}
 			break;
+    #ifdef PBL_BW
 		case INVERT_KEY:
 			invert = tuple->value->uint8 == 1;
 			persist_write_bool(INVERT_KEY, invert);
 			layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
 			layer_mark_dirty(inverter_layer_get_layer(inverter_layer));
 			break;
+    #endif
 		case LANGUAGE_KEY:
 			lang = (Language) tuple->value->uint8;
 			persist_write_int(LANGUAGE_KEY, lang);
@@ -1203,10 +1169,14 @@ static void process_key_value(Tuple *tuple)
 			  APP_LOG(APP_LOG_LEVEL_DEBUG,"problems with key %u", (unsigned int) key);
 			}
 	}
-	if (actual_time)
+	if (actual_time)//actual_time seems not to be persistent, so this is
+	//wrong on pebble_time
 	{
+  	time_t raw_time;
+  	time(&raw_time);
+  	actual_time = localtime(&raw_time); //where is memory handled
+	  
 	  handle_minute_tick(actual_time,MINUTE_UNIT);
-		//display_time(actual_time);
 	}
 }
 //event-handlers
@@ -1276,6 +1246,60 @@ static void handle_message_init()
                                        
 }
         
+static void window_load(Window *window)
+{
+	Layer *window_layer = window_get_root_layer(window);
+	GRect bounds = layer_get_frame(window_layer);
+	//ok, get x 0 y 0 w 144 h 168
+	// Init and load lines
+	for (int i = 0; i < NUM_LINES; i++)
+	{
+		init_line(&lines[i]);
+		layer_add_child(window_layer, (Layer *)lines[i].currentLayer);
+		layer_add_child(window_layer, (Layer *)lines[i].nextLayer);
+	}
+	tempLayer = text_layer_create(GRect(144, 0, 144, 50));//besser hier, performance?
+	text_layer_set_text(tempLayer,tempLayerText); //sonst hat er keinen speicher
+	layer_add_child(window_layer, (Layer *)tempLayer);
+
+  deltaLayer = prepareTextLayer (window_layer, deltaLayerText, GTextAlignmentCenter, 0,0,144,28);//x,y,w,h
+  doneLayerL = prepareTextLayer (window_layer, doneLayerTextL,GTextAlignmentLeft, 0,0,144,28);  
+  doneLayerR = prepareTextLayer (window_layer, doneLayerTextR,GTextAlignmentRight,94,0,50,28);  
+
+  batteryLayer = layer_create(GRect(0,5,144,34)); //von 35 bis 36
+  layer_set_update_proc(batteryLayer, batteryDisplayUpdate);
+  layer_add_child(window_layer,batteryLayer);
+  batteryDisplay();
+#ifdef PBL_BW
+	inverter_layer = inverter_layer_create(bounds);
+	layer_set_hidden(inverter_layer_get_layer(inverter_layer), !invert);
+	layer_add_child(window_layer, inverter_layer_get_layer(inverter_layer));
+#endif
+	// Configure time on init
+	    
+	time_t raw_time;
+	time(&raw_time);
+	actual_time = localtime(&raw_time); //where is memory handled
+	display_actual_time(actual_time);	
+  //message gedoens
+  
+
+}
+
+static void window_unload(Window *window)
+{
+	// Free layers
+	#ifdef PBL_BW
+	inverter_layer_destroy(inverter_layer);
+  #endif
+  text_layer_destroy(tempLayer);
+	for (int i = 0; i < NUM_LINES; i++)
+	{
+		destroy_line(&lines[i]);
+	}
+}
+
+
 static void handle_init() {
 	// Load settings from persistent storage
   /*remember 
@@ -1375,20 +1399,19 @@ static void handle_init() {
   //logTT("handle_init");
  	//log_array(customHours,24);
  	//log_array(customRels,12);
-
+  
 	window = window_create();
 	window_set_background_color(window, GColorBlack);
 	window_set_window_handlers(window, (WindowHandlers) {
 		.load = window_load,
 		.unload = window_unload
 	});
+	#ifdef PBL_BW
   window_set_fullscreen(window, true); 
-
+  #endif 
   //subscribe tap_handler
   if (shakeDetect)
     accel_tap_service_subscribe(tap_handler);
-  //message gedoens
-  handle_message_init();	
 
 	const bool animated = true;
 	window_stack_push(window, animated);
@@ -1399,6 +1422,7 @@ static void handle_init() {
 	// Button functionality
 	window_set_click_config_provider(window, (ClickConfigProvider) click_config_provider);
 #endif
+ handle_message_init();	
 }
 
 static void handle_deinit()

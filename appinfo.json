@@ -4,16 +4,23 @@
   "longName": "Fuzzy Text International TimeTable edition",
   "companyName": "KaRo",
   "versionCode": 4,
-  "versionLabel": "1.6",
+  "versionLabel": "1.7",
   "watchapp": {
     "watchface": true
   },
-  "capabilities": [ "configurable" ],
+  "capabilities": [
+    "configurable"
+  ],
   "appKeys": {
-		"SEND_BATTERY_KEY": 1,
+    "SEND_BATTERY_KEY": 1,
     "BATTERY_LEVEL_KEY": 20
-	},
+  },
   "resources": {
     "media": []
-  }
+  },
+  "targetPlatforms": [
+    "aplite",
+    "basalt"
+  ],
+  "sdkVersion": "3"
 }

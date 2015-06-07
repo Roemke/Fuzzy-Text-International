@@ -6,6 +6,10 @@ others
 
 Bug fixes and additions to the original work (details see CHANGES)
 
+Version 1.7 is done with sdk 3.0 and works on Pebble Time - I'm not 
+sure, if it work on "Old Pebble" it should, if not, send me an email,
+I'm not wearing to watches.
+
 Additions (optional):
 - shows battery status
 - shows delta between fuzzy and real time (real - fuzzy)

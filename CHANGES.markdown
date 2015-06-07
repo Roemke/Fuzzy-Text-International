@@ -4,7 +4,7 @@
 Changes
 ========
 
-The latest version is 1.5  To update, remove the watchface from your
+The latest version is 1.7  To update, remove the watchface from your
 watch and then load it again from your locker.
 
 The iOS version has to go through the Apple Store approval process - so
@@ -14,6 +14,21 @@ watchface. (original comment, I havn't access to an iphone)
 
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
+
+version 1.7
+-------------
+Compiled for pebble time with sdk 3  
+Problems with actual_time - on "old pebble" the pointer
+was persistant and points to a valid time struct. In pebble time
+this seems not to work.
+
+Changed the german zwanzig nach into zehn vor halb &ndash; no font
+change should be neccessary, will see if I have it right in mind (thanks to 
+dersvenhesse) 
+
+For battery status of phone you need still the android app, the sandbox 
+of pebble still does not support battery status object.
+
 
 version 1.6
 ------------
