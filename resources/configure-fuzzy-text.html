@@ -50,7 +50,7 @@
 	var getObject = {};
 	var days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
     var dayKeys = [1000,2000,3000,4000,5000,6000,7000];
-	var LATEST = "1.7";
+	var LATEST = "1.8";
 
 	function saveOptions() {
 		var params = {}; //read content of #config as array
@@ -350,7 +350,9 @@ $(document).on('pagecreate','#optionPage', function() {
 				</fieldset>
 
 							DO NOT enable battery of phone if you don't have running the special JSON
-							service on your phone. 
+							service on your phone. Update: I've installed android 6 on my phone - there 
+							the needed battery object in new style is implemented. I've fixed the application
+							to use this. 
 				
 				<div data-role="controlgroup">
 						<label>

@@ -1,4 +1,4 @@
-var VERSION = "1.6";
+var VERSION = "1.8";
 
 var isReady = false;
 var callbacks = []; //stack for callbacks
@@ -188,7 +188,16 @@ Pebble.addEventListener('appmessage',
                   function(bat)
                   {
                      console.log("found new style bat object");
+                     //console.log("bat is ");
+                     //console.log(JSON.stringify(bat));
+                     console.log("Battery charging? " + (bat.charging ? "Yes" : "No"));
+					 console.log("Battery level: " + bat.level * 100 + "%");
+  					 console.log("Battery charging time: " + bat.chargingTime + " seconds");
+  					 console.log("Battery discharging time: " + bat.dischargingTime + " seconds");
+                     Pebble.sendAppMessage({ 'BATTERY_LEVEL_KEY': parseInt(bat.level*100) });
                   }); //need to code this, if pebbles sandbox sometimes support it
+                  //2016 with android 6 seems to be supported this, but object is empty :-( no 
+                  	//JSON.stringify does not work in this environment 
             } //hhm restructure it to use if - else if - else
             else 
             {

@@ -253,3 +253,16 @@ git branch -D workOnLanguage geht, sollte auch ok sein, habe zur
 sicherheit mal vorher manuelles backup angelegt
 noch ein fehler bei popup timetablen - den habe ich später selbst herein
 gebaut 
+----------------------
+2016-01-02 da macht man ein halbes jahr nichts und alles ist vergessen:
+batterie phone wird nicht angezeigt (pebble time steel / android 6)
+pebble build geht
+starte im emulator 
+pebble install --emulator basalt (geht auch) nehme aber lieber die Uhr
+export PEBBLE_PHONE=192.168.2.124
+pebble install - succeed aber anwendung auf der Uhr weg :-(
+klar, habe auch als watchapp installiert
+new style bat object found wird gesagt 
+aendere pebble-js-app.js, muss pebble clean abschicken, damit es klappt
+und liegt daran, dass das battery object unter android 6 unterstuetzt wird
+

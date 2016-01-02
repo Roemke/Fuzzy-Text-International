@@ -4,7 +4,7 @@
 Changes
 ========
 
-The latest version is 1.7  To update, remove the watchface from your
+The latest version is 1.8  To update, remove the watchface from your
 watch and then load it again from your locker.
 
 The iOS version has to go through the Apple Store approval process - so
@@ -15,6 +15,16 @@ watchface. (original comment, I havn't access to an iphone)
 Android users do not need to wait for the Pebble app to update before
 updating the watchface.
 
+version 1.8 
+-------------
+Battery Status Bug fixed: on my phone there was never the new style battery 
+object. But after updating my phone to android 6.0 the battery object was found.   
+Since so far I havn't implemented this, the battery level was out of order.
+I have no android 5 phone, so I don't know if this phones were also affected.	
+
+So, if you are using android 6 it may not be neccessary to install the small
+JSON-Server.
+		
 version 1.7
 -------------
 Compiled for pebble time with sdk 3  
